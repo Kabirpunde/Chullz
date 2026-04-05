@@ -1,7 +1,7 @@
-# Poker Club App — PRD
+# Chullz — Multiplayer Poker App PRD
 
 ## Original Problem Statement
-Build a poker game app with PPPoker-style UI. Phase 1: Create simple testing profiles for multiplayer testing. The app is a multiplayer app that needs multiplayer testing.
+Build "Chullz" — a real-time multiplayer Texas Hold'em variant with 3 independent community boards (Flop/Turn/River per board). Players get 6 hole cards (face-up). After River round, 1-minute card assignment phase where players assign 2 hole cards to each of 3 boards. Pot Limit betting (25/33/50/66/75/100% pot presets + slider). 1 point per board won; most points wins pot (ties split). Use existing FastAPI + WebSocket backend, React Native (Expo) frontend, 7 pre-seeded test accounts, PPPoker dark theme.
 
 ## Architecture
 - **Frontend**: React Native Expo SDK 54 (expo-router v6, file-based routing)
@@ -49,27 +49,38 @@ Build a poker game app with PPPoker-style UI. Phase 1: Create simple testing pro
 
 ## Prioritized Backlog
 
-### P0 — Core Gameplay (Next Phase)
-- [ ] Texas Hold'em game engine (deal cards, betting rounds, hand evaluation)
-- [ ] Real-time game state sync via WebSocket
-- [ ] Multiple concurrent tables support
-- [ ] Player actions: Fold, Check, Call, Raise, All-In
+### P0 — Core Gameplay (COMPLETE - Phase 2, April 2026)
+- [x] Chullz 3-board game engine (deal 6 cards, 3 independent boards, pot-limit betting)
+- [x] Real-time game state sync via WebSocket (/api/game/ws/{table_id}/{user_id})
+- [x] Multiple concurrent tables support
+- [x] Player actions: Fold, Check, Call, Raise, All-In (Pot Limit)
+- [x] Card Assignment Phase (60s timer, tap-to-assign + drag-to-board)
+- [x] Showdown scoring (1 point per board, chips awarded to winner)
+- [x] Lobby with Create Table modal + Join Table flow
+- [x] 3 fixed backend bugs: turn rotation, heads-up blind assignment, WS player-join sync
 
-### P1 — Table Management
-- [ ] Create Table with settings (buy-in, blind levels, max players)
-- [ ] Join Table from lobby
+### P1 — Remaining (Next Phase)
+- [ ] Showdown overlay: full end-to-end test with both players completing assignment
+- [ ] Add testIDs to AssignmentPanel for automated testing
+- [ ] Table cleanup on WS disconnect (stale tables)
 - [ ] Spectator mode
 - [ ] Table chat
 
 ### P2 — Polish
-- [ ] Player avatars customization
+- [ ] Card dealing animations
+- [ ] Chip movement animations
 - [ ] Hand history
-- [ ] Tournament mode
+- [ ] Player avatars customization
 - [ ] Statistics tracking (games played, win rate)
-- [ ] Admin: reset all chips to default
+- [ ] Admin: reset all chips
 
 ## Tech Notes
-- WebSocket endpoint: `/api/ws/{user_id}` — connects on lobby mount, disconnects on unmount
+- WebSocket game: `/api/game/ws/{table_id}/{user_id}` — connects on table mount, auto-reconnects
+- Lobby presence: `/api/ws/{user_id}` — connects on lobby mount
+- Pot Limit buttons: 25/33/50/66/75/100% + slider + custom input
+- Card Assignment: 3 boards × 2 slots = 6 total; tap or drag from 6 hole cards
+- Assignment timeout: server auto-assigns random after 60s; frontend shows 60s countdown
 - CORS currently `allow_origins=["*"]` — update for production
 - All PINs are bcrypt-hashed in MongoDB
 - Token TTL: 7 days
+- game_rooms in-memory dict (reset on server restart) — intentional for session play
