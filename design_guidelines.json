@@ -1,0 +1,102 @@
+{
+  "theme": "Dark",
+  "archetype": "7 (Electric & Neon) modified for Casino Gaming",
+  "domain": "Mobile Multiplayer Poker Game (React Native Expo)",
+  "colors": {
+    "background": "#0a0f1a",
+    "surface": "#131a2a",
+    "surface_border": "#1e293b",
+    "table_felt": "#0e7a3e",
+    "table_leather": "#1a1a1a",
+    "table_glow": "#00f0ff",
+    "text_main": "#ffffff",
+    "text_muted": "#94a3b8",
+    "action_raise": "#ffb800",
+    "action_call": "#00f0ff",
+    "action_fold": "#ef4444",
+    "status_online": "#22c55e",
+    "status_offline": "#64748b"
+  },
+  "typography": {
+    "primary_font": "Outfit",
+    "secondary_font": "Space Mono",
+    "headings": "text-2xl to text-4xl, font-black, tracking-tight, uppercase for gaming feel",
+    "body": "text-base, font-medium, leading-tight",
+    "chip_counts": "text-sm, font-mono, tracking-widest, text-action_raise"
+  },
+  "spacing_and_layout": {
+    "global_padding": "p-4 md:p-6",
+    "border_radius": {
+      "cards": "rounded-2xl",
+      "buttons": "rounded-xl",
+      "avatars": "rounded-full"
+    },
+    "poker_table": {
+      "shape": "Oval via extreme border-radius (e.g., rounded-full) on a rectangular container where width > height.",
+      "layout": "Positioned centrally. Uses absolute positioning for player avatars around the perimeter of the table container.",
+      "avatar_positions": [
+        "top-center", 
+        "top-right", 
+        "bottom-right", 
+        "bottom-center", 
+        "bottom-left", 
+        "top-left"
+      ]
+    },
+    "bento_grids": {
+      "lobby": "Vertical stack of cards with tight gaps (gap-4). Dense data display for online players and active tables.",
+      "profile_selection": "2-column grid (grid-cols-2) for cartoon avatars, ensuring large tap targets for mobile."
+    }
+  },
+  "components": {
+    "avatar_card": {
+      "style": "bg-surface border border-surface_border rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden",
+      "interaction": "active:scale-95 transition-transform"
+    },
+    "poker_table_ui": {
+      "felt": "bg-[#0e7a3e] border-[16px] border-[#1a1a1a]",
+      "glow": "shadow-[0_0_30px_rgba(0,240,255,0.4)]",
+      "community_cards": "flex-row gap-1 absolute center"
+    },
+    "action_buttons": {
+      "container": "flex-row justify-between gap-2 p-2 bg-surface/80 rounded-t-3xl",
+      "button_base": "flex-1 py-4 rounded-xl items-center justify-center",
+      "fold": "bg-surface border border-action_fold text-action_fold",
+      "call": "bg-action_call text-background",
+      "raise": "bg-action_raise text-background"
+    },
+    "chip_badge": {
+      "style": "bg-black/60 rounded-full px-3 py-1 flex-row items-center border border-surface_border",
+      "text": "text-action_raise font-mono font-bold text-xs"
+    }
+  },
+  "image_urls": {
+    "avatars": {
+      "description": "Pre-seeded cartoon animal avatars for the 7 profiles (6 players + 1 admin)",
+      "urls": [
+        "https://images.unsplash.com/photo-1676873261959-173b91552b0d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHwxfHxjYXJ0b29uJTIwYW5pbWFsJTIwYXZhdGFyfGVufDB8fHx8MTc3NTM3MTQzOXww&ixlib=rb-4.1.0&q=85",
+        "https://images.unsplash.com/photo-1649011402555-50600801ceaa?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHw0fHxjYXJ0b29uJTIwYW5pbWFsJTIwYXZhdGFyfGVufDB8fHx8MTc3NTM3MTQzOXww&ixlib=rb-4.1.0&q=85",
+        "https://images.unsplash.com/photo-1649011402576-a7bc591b8f85?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHwzfHxjYXJ0b29uJTIwYW5pbWFsJTIwYXZhdGFyfGVufDB8fHx8MTc3NTM3MTQzOXww&ixlib=rb-4.1.0&q=85"
+      ]
+    },
+    "textures": {
+      "description": "Background textures for the table (optional overlay)",
+      "felt": "https://images.unsplash.com/photo-1601370690183-1c7796ecec61?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwxfHxncmVlbiUyMHBva2VyJTIwdGFibGUlMjB0ZXh0dXJlfGVufDB8fHx8MTc3NTM3MTQzOXww&ixlib=rb-4.1.0&q=85",
+      "leather": "https://images.unsplash.com/photo-1731272832794-d66014ad7d87?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzF8MHwxfHNlYXJjaHw0fHxibGFjayUyMGxlYXRoZXIlMjB0ZXh0dXJlfGVufDB8fHx8MTc3NTM3MTQzOXww&ixlib=rb-4.1.0&q=85"
+    },
+    "chips": {
+      "description": "Casino chips for UI adornments or admin screen",
+      "url": "https://images.unsplash.com/photo-1551368998-d349c755c74c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzR8MHwxfHNlYXJjaHw0fHxjYXNpbm8lMjBwb2tlciUyMGNoaXBzfGVufDB8fHx8MTc3NTM3MTQyN3ww&ixlib=rb-4.1.0&q=85"
+    }
+  },
+  "instructions_to_main_agent": [
+    "CRITICAL: This is a React Native Expo app. Do NOT use HTML tags (div, span, p). Use React Native components (View, Text, Image, TouchableOpacity, Pressable).",
+    "CRITICAL: Use .js files, not .tsx files.",
+    "Use NativeWind for styling. Map the hex colors to tailwind config or use arbitrary values like bg-[#0a0f1a].",
+    "For the Poker Table layout: Create an outer wrapper View with landscape or portrait bounds. Inside, create an oval View for the table. Position the 6 player avatars using 'absolute' positioning around the table edges.",
+    "The Teal Glow on the table edge can be achieved using standard React Native shadows (shadowColor: '#00f0ff', shadowOffset, shadowOpacity, shadowRadius) or an Image background if performance allows.",
+    "For action buttons at the bottom: Group them in a container that sits at the bottom of the screen (absolute bottom-0 or flex-end).",
+    "Ensure all interactive components (buttons, avatar cards) have a data-testid attribute for testing (e.g., data-testid='profile-login-button').",
+    "Never use generic fonts like Inter. Setup custom fonts or use platform native bold sans-serif."
+  ]
+}
