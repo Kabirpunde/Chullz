@@ -58,6 +58,9 @@ Build "Chullz" — a real-time multiplayer Texas Hold'em variant with 3 independ
 - [x] Showdown scoring (1 point per board, chips awarded to winner)
 - [x] Lobby with Create Table modal + Join Table flow
 - [x] 3 fixed backend bugs: turn rotation, heads-up blind assignment, WS player-join sync
+- [x] Visual green oval felt table restored with compact 90px design
+- [x] All 3 community boards visible simultaneously (no scroll) below oval during game
+- [x] AssignmentPanel: all 3 boards visible without horizontal scroll (flex-based layout)
 
 ### P1 — Remaining (Next Phase)
 - [ ] Showdown overlay: full end-to-end test with both players completing assignment

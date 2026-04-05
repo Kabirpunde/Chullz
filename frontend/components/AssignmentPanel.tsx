@@ -223,11 +223,8 @@ export default function AssignmentPanel({
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-        {/* 3 boards with slots */}
-        <ScrollView
-          horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.boardsContent}
-        >
+        {/* 3 boards with slots — all visible in a row without horizontal scroll */}
+        <View style={styles.boardsRow}>
           {BOARD_KEYS.map((bk, idx) => {
             const board = boards[idx];
             const slots = assignment[bk];
@@ -243,7 +240,7 @@ export default function AssignmentPanel({
                 {/* Community cards */}
                 <View style={styles.communityRow}>
                   {community.map((card, i) => (
-                    <PlayingCard key={i} card={card} size="xs" />
+                    <PlayingCard key={i} card={card} size="tiny" />
                   ))}
                 </View>
 
@@ -268,7 +265,7 @@ export default function AssignmentPanel({
                       >
                         {card ? (
                           <View pointerEvents="none">
-                            <PlayingCard card={card} size="sm" assigned />
+                            <PlayingCard card={card} size="xs" assigned />
                           </View>
                         ) : (
                           <Text style={styles.slotEmpty}>
@@ -297,7 +294,7 @@ export default function AssignmentPanel({
               </View>
             );
           })}
-        </ScrollView>
+        </View>
 
         {/* Hole cards */}
         <View style={styles.holeSection}>
@@ -419,19 +416,23 @@ const styles = StyleSheet.create({
 
   scroll: { flex: 1 },
 
-  boardsContent: {
-    paddingHorizontal: 12, paddingVertical: 14, gap: 10,
+  // 3 boards row — all visible without horizontal scroll
+  boardsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    gap: 8,
   },
   boardCard: {
-    width: 148, backgroundColor: '#131a2a', borderRadius: 16,
-    borderWidth: 1, padding: 10, alignItems: 'center', gap: 8,
+    flex: 1, backgroundColor: '#131a2a', borderRadius: 14,
+    borderWidth: 1, padding: 8, alignItems: 'center', gap: 6,
   },
   boardLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
   communityRow: { flexDirection: 'row', gap: 2, flexWrap: 'wrap', justifyContent: 'center' },
 
-  slotsRow: { flexDirection: 'row', gap: 8 },
+  slotsRow: { flexDirection: 'row', gap: 6 },
   slot: {
-    width: 50, height: 68, borderRadius: 8,
+    width: 42, height: 58, borderRadius: 7,
     borderWidth: 2, borderStyle: 'dashed',
     backgroundColor: '#0a0f1a',
     alignItems: 'center', justifyContent: 'center',
