@@ -287,25 +287,30 @@ agent_communication:
       All backend APIs are confirmed working from logs.
   - agent: "main"
     message: |
-      LATEST UPDATE - Visual Layout Redesign (user complaint: "had to scroll to see board 2 and 3"):
+      LATEST UPDATE - Card redesign + AssignmentPanel layout overhaul:
       
       Changes made:
-      1. poker-table.tsx: Moved 3 community boards OUTSIDE the oval (below it in boardsSection)
-         - All 3 boards now show as a horizontal row below the table (no scrolling needed)
-         - Oval table is now compact 90px, shows only pot/branding
-         - OpponentsRow changed to horizontal ScrollView (no more wrapping to 2 rows)
-         - PlayingCard.tsx: added 'tiny' size (22x30) for compact board cards
-      2. Layout verified in waiting state - green oval table is visible, no scrolling
+      1. PlayingCard.tsx: COMPLETELY REDESIGNED
+         - Removed corner rank numbers (top-left + bottom-right)
+         - Now shows ONLY rank + suit symbol CENTERED in the card
+         - Suit colors: hearts=red (#dc2626), diamonds=blue (#1d4ed8), clubs=green (#16a34a), spades=dark (#111827)
+         - Much cleaner and readable at all sizes (tiny/xs/sm/md/lg)
+         - Added 'tiny' size (22x30) for community boards
       
-      KEY: boardsSection ONLY shows when round !== 'waiting', so during an active game (preflop/flop/turn/river)
-      all 3 community boards appear below the oval table as equal-width columns.
+      2. AssignmentPanel.tsx: BOARD LAYOUT REDESIGNED
+         - Changed from 3 horizontal columns to 3 vertical rows (stacked)
+         - Each board row is full screen width: [B1 label] [5 community cards] | [slot1][slot2] | [preview]
+         - All in a single horizontal row per board, stacked vertically
+         - No horizontal scrolling needed at all
+         - Community cards show as xs size (30x40) with new centered design
       
-      Test focus for this session: 
-      1. Verify waiting state: green oval visible, player seats visible, no scrolling required
-      2. Start a 2-player game: verify all 3 boards visible simultaneously below oval without scrolling  
-      3. Verify betting (Fold/Check/Raise) works in active game
-      4. Verify card assignment panel appears after river betting
-      5. Verify showdown displays correctly
+      TEST FOCUS:
+      1. Start a 2-player game (AceKing host, BluffMaster joins), Start Game
+      2. Check active game: hole cards visible with new card design (rank+suit centered, color-coded)
+      3. Community boards (tiny cards below oval) visible during game  
+      4. Check assignment phase: 3 board rows visible vertically (BOARD 1, BOARD 2, BOARD 3 stacked)
+         - B1 label | community cards in row | 2 slots | preview
+      5. Verify card colors: red for hearts/♥, blue for diamonds/♦, green for clubs/♣, dark for spades/♠
+      6. Verify hole cards at bottom (6 cards) look clean and readable
       
-      Use localhost:3000 for testing (preview URL has ngrok tunnel issue).
-      Login: select player avatar → enter 4-digit PIN using numpad-btn-{n} testIDs.
+      Use localhost:3000 (preview URL unavailable). Login via testID profile-card clicks + numpad-btn-{n}.

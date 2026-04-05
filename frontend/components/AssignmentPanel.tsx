@@ -223,8 +223,8 @@ export default function AssignmentPanel({
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-        {/* 3 boards with slots — all visible in a row without horizontal scroll */}
-        <View style={styles.boardsRow}>
+        {/* 3 boards — each is a full-width horizontal row stacked vertically */}
+        <View style={styles.boardsColumn}>
           {BOARD_KEYS.map((bk, idx) => {
             const board = boards[idx];
             const slots = assignment[bk];
@@ -233,18 +233,30 @@ export default function AssignmentPanel({
             const community = board
               ? [...board.flop, board.turn, board.river].filter(Boolean)
               : [];
-            return (
-              <View key={bk} style={[styles.boardCard, { borderColor: color + '40' }]}>
-                <Text style={[styles.boardLabel, { color }]}>{BOARD_NAMES[idx]}</Text>
 
-                {/* Community cards */}
+            return (
+              <View key={bk} style={[styles.boardRow, { borderLeftColor: color, borderLeftWidth: 3 }]}>
+                {/* Board label */}
+                <View style={[styles.boardLabelBox, { backgroundColor: color + '18' }]}>
+                  <Text style={[styles.boardLabelTxt, { color }]}>B{idx + 1}</Text>
+                </View>
+
+                {/* Community cards — all 5 in a row */}
                 <View style={styles.communityRow}>
-                  {community.map((card, i) => (
-                    <PlayingCard key={i} card={card} size="tiny" />
+                  {[0, 1, 2, 3, 4].map(i => (
+                    <PlayingCard
+                      key={i}
+                      card={community[i] ?? undefined}
+                      faceDown={!community[i]}
+                      size="xs"
+                    />
                   ))}
                 </View>
 
-                {/* Hole card slots */}
+                {/* Divider */}
+                <View style={styles.rowDivider} />
+
+                {/* Assignment slots */}
                 <View style={styles.slotsRow}>
                   {[0, 1].map(si => {
                     const slotKey = `${bk}_slot_${si}`;
@@ -257,7 +269,7 @@ export default function AssignmentPanel({
                         onPress={() => handleSlotTap(bk, si)}
                         style={[
                           styles.slot,
-                          { borderColor: color + '60' },
+                          { borderColor: color + '70' },
                           card ? styles.slotFilled : null,
                           !card && selectedCard ? styles.slotReady : null,
                         ]}
@@ -268,7 +280,7 @@ export default function AssignmentPanel({
                             <PlayingCard card={card} size="xs" assigned />
                           </View>
                         ) : (
-                          <Text style={styles.slotEmpty}>
+                          <Text style={[styles.slotEmpty, { color: selectedCard ? color : undefined }]}>
                             {selectedCard ? '↓' : '?'}
                           </Text>
                         )}
@@ -284,9 +296,9 @@ export default function AssignmentPanel({
                       {preview.description}
                     </Text>
                   ) : (
-                    <Text style={styles.previewEmpty}>
-                      {slots.filter(Boolean).length === 0 ? 'No cards'
-                        : slots.filter(Boolean).length === 1 ? 'Need 1 more'
+                    <Text style={styles.previewEmpty} numberOfLines={1}>
+                      {slots.filter(Boolean).length === 0 ? '—'
+                        : slots.filter(Boolean).length === 1 ? '+1'
                         : '—'}
                     </Text>
                   )}
@@ -416,40 +428,44 @@ const styles = StyleSheet.create({
 
   scroll: { flex: 1 },
 
-  // 3 boards row — all visible without horizontal scroll
-  boardsRow: {
-    flexDirection: 'row',
+  // 3 boards stacked vertically — each is a full-width row
+  boardsColumn: {
     paddingHorizontal: 10,
-    paddingVertical: 12,
+    paddingVertical: 8,
     gap: 8,
   },
-  boardCard: {
-    flex: 1, backgroundColor: '#131a2a', borderRadius: 14,
-    borderWidth: 1, padding: 8, alignItems: 'center', gap: 6,
+  boardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0d1420',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    gap: 8,
   },
-  boardLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
-  communityRow: { flexDirection: 'row', gap: 2, flexWrap: 'wrap', justifyContent: 'center' },
-
-  slotsRow: { flexDirection: 'row', gap: 6 },
+  boardLabelBox: {
+    width: 30, height: 30, borderRadius: 6,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  boardLabelTxt: { fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+  communityRow: { flexDirection: 'row', gap: 3 },
+  rowDivider: { width: 1, height: 34, backgroundColor: '#1e293b' },
+  slotsRow: { flexDirection: 'row', gap: 5 },
   slot: {
-    width: 42, height: 58, borderRadius: 7,
+    width: 32, height: 44, borderRadius: 6,
     borderWidth: 2, borderStyle: 'dashed',
     backgroundColor: '#0a0f1a',
     alignItems: 'center', justifyContent: 'center',
   },
-  slotFilled: { borderStyle: 'solid', backgroundColor: '#1a2035' },
-  slotReady: {
-    borderStyle: 'solid',
-    backgroundColor: '#00f0ff10', borderColor: '#00f0ff80',
-  },
-  slotEmpty: { fontSize: 20, color: 'rgba(255,255,255,0.2)' },
+  slotFilled: { borderStyle: 'solid', backgroundColor: '#0f1e30' },
+  slotReady: { borderStyle: 'solid', backgroundColor: '#00f0ff12', borderColor: '#00f0ff80' },
+  slotEmpty: { fontSize: 16, color: '#334155', fontWeight: '700' },
 
-  previewBox: {
-    width: '100%', minHeight: 30,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
-  },
-  previewTxt: { fontSize: 10, fontWeight: '700', textAlign: 'center', lineHeight: 14 },
-  previewEmpty: { fontSize: 10, color: '#334155', textAlign: 'center' },
+  previewBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  previewTxt: { fontSize: 9, fontWeight: '800', textAlign: 'center' },
+  previewEmpty: { fontSize: 9, color: '#334155', textAlign: 'center' },
 
   holeSection: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   holeSectionLabel: {
