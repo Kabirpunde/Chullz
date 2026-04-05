@@ -1,0 +1,92 @@
+{
+  "summary": "Full Chullz Phase 2 backend + frontend testing. 35 backend tests pass. Multiplayer game flow verified: login, lobby, create table, join table, start game, 3 community boards, 6 hole cards, action buttons, card assignment phase (60s countdown, 3 boards, 6 cards, slot interaction). 3 critical game engine bugs found and FIXED. Showdown overlay not fully tested (card assignment interaction limited without testIDs on hole cards/slots).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/tables",
+        "issue": "In-memory tables persist when players navigate away without pressing back. Over time, stale tables accumulate (players not removed on WS disconnect). Recommend: remove player from room when WS disconnects for >N seconds."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AssignmentPanel.tsx",
+        "issue": "Hole cards use PanResponder with no testID attributes - cannot be targeted by automated tests. Slot buttons also have no testID. Consider adding testID to each hole card wrapper and slot TouchableOpacity.",
+        "testID": "hole-card-{idx}, assign-slot-{board}-{slot}",
+        "priority": "LOW (testing only)"
+      },
+      {
+        "component": "poker-table.tsx back button",
+        "issue": "Back button has no testID attribute. Had to use coordinate click for testing.",
+        "testID": "back-btn",
+        "priority": "LOW (testing only)"
+      },
+      {
+        "component": "AssignmentPanel.tsx submit button",
+        "issue": "Submit button has no testID attribute.",
+        "testID": "submit-assignment-btn",
+        "priority": "LOW (testing only)"
+      },
+      {
+        "component": "CommunityBoard in poker-table.tsx",
+        "issue": "Board 3 is horizontally scrolled off-screen on mobile (390px wide). User needs to swipe horizontally to see Board 3 during both playing and assignment phases.",
+        "testID": "board-3",
+        "priority": "MEDIUM - consider layout adjustment"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Card Assignment → Showdown",
+        "issue": "Showdown overlay not directly tested via automation due to PanResponder limitation on hole cards. Verified: assignment phase appears, cards can be assigned via tap+slot, submit disabled until all assigned. Could not complete full both-player submit to trigger showdown.",
+        "affected_testIDs": ["submit-assignment-btn", "showdown-overlay"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "poker-table (game phase)",
+        "issues": [
+          "Board 3 requires horizontal scroll to be visible - consider making boards scrollable with visible indicator",
+          "Cards slightly flipped/mirrored display in the hole cards row (suit symbols appear upside down on some cards - visual only)"
+        ]
+      }
+    ],
+    "react_native_issues": [
+      {
+        "component": "Global",
+        "issue": "shadow* style props deprecated warnings (shadow*, use boxShadow). Cosmetic only."
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_chullz_game.py",
+    "/app/backend/tests/test_poker_api.py",
+    "/app/test_reports/pytest/pytest_results_iter2.xml"
+  ],
+  "action_items": [
+    "IMPORTANT: Add testID to AssignmentPanel hole cards (hole-card-{idx}), slot buttons (assign-slot-{board}-{slot}), and submit button (submit-assignment-btn) to enable automated testing",
+    "IMPORTANT: Add testID to back button in poker-table.tsx (back-btn)",
+    "MEDIUM: Consider if 3-board horizontal scroll UX is optimal for mobile - Board 3 is off-screen on 390px width",
+    "LOW: Add cleanup logic when player WS disconnects (remove player from room after grace period) to prevent stale table accumulation",
+    "LOW: Verify showdown overlay manually - it was not automatable due to PanResponder interaction limitation"
+  ],
+  "critical_code_review_comments": [
+    "FIXED: server.py _next_active_seat(room, current_seat - 1) was incorrectly using current_seat-1, causing the same player to always get the turn. Fixed to _next_active_seat(room, current_seat) for correct rotation.",
+    "FIXED: server.py heads-up blind assignment used _next_active_seat(room, dealer_seat - 1) which returned dealer's own seat for both SB and BB. Fixed: heads-up now correctly sets sb_seat=dealer_seat, bb_seat=_next_active_seat(room, dealer_seat).",
+    "FIXED: server.py game_ws handler: new player connection didn't broadcast game_state to existing players (only player_connected event was sent). Fixed by adding _broadcast_state() after player_connected broadcast.",
+    "WARNING: server.py CORS allows_origins=['*'] with allow_credentials=True may be rejected by some browsers. Should use explicit origins for production."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (3 bug fixes: broadcast_state on connect, sb/bb seat assignment, current_seat rotation)"
+  ],
+  "success_rate": {
+    "backend": "100% (35/35 tests passed)",
+    "frontend": "90% - all critical flows verified except showdown overlay (limited by PanResponder automation)"
+  },
+  "seed_data_creation": "No new seed data created. 7 pre-seeded test accounts used (AceKing/1111, BluffMaster/2222, CardShark/3333 etc.).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "3 critical game engine bugs were fixed in server.py. The game now correctly assigns SB/BB positions (AceKing=Dealer/SB, BluffMaster=BB), rotates turns correctly through all streets, and broadcasts state to all players when a new WS connection joins. Full game flow tested: PRE-FLOP through RIVER, assignment phase confirmed. Showdown overlay not tested - need to test via manual play or by adding testIDs to hole cards in AssignmentPanel.tsx. The card assignment UI works (tap card then tap slot) but has no testIDs for reliable automation.",
+  "rca_of_issue": "Root Cause: The _next_active_seat(room, from_seat) function finds the NEXT seat AFTER from_seat. The calling code used from_seat = current_seat - 1 instead of current_seat, causing the function to return the current player's seat again (off-by-one error). For 2 players at seats 0 and 1: _next_active_seat(room, 1-1=0) = seat 1 (same player), while _next_active_seat(room, 1) = seat 0 (correct next player). Same bug caused SB/BB miscalculation. Fix: use current_seat (not current_seat-1) throughout _apply_action and _start_hand blind assignment."
+}

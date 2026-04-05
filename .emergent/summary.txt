@@ -1,0 +1,136 @@
+<analysis>**original_problem_statement**: 
+The user wants to build a real-time online multiplayer poker app called Chullz — a custom Texas Hold'em variant. 
+**Key Rules for Chullz:** 
+- 3 independent community boards (Flop, Turn, River each). 
+- Players are dealt 6 hole cards (face-up to the player). 
+- Betting is **Pot Limit** (not No-Limit). Minimum raise is 1 Big Blind or the size of the previous bet/raise.
+- **Card Assignment Phase (Critical):** 1 minute after the final betting round (River), players must assign exactly 2 hole cards to each of the 3 boards. 
+- 1 point per board won. The player with the most points wins the pot (ties split the pot). 
+- **Tech Setup:** Use the existing FastAPI + WebSockets backend and React Native (Expo) frontend. **Do not use Supabase.** Use the 7 pre-seeded test accounts and maintain the dark PPPoker theme.
+
+**User's preferred language**: English
+*(INSTRUCTION: Next agent must respond in English only)*
+
+**what currently exists?**: 
+Phase 1 (a basic poker MVP with 7 pre-seeded test accounts and Lobby UI) was fully completed and passed tests. For Phase 2 (Chullz), the backend  and  have been updated to support the 3-board logic and Pot Limit rules. The dependency conflict between  and  was successfully resolved, and the backend is running perfectly. Several new frontend UI components (, , , ) and a  utility were just created but are not yet wired into the main game screen.
+
+**Last working item**:
+    - Last item agent was working: Creating the frontend UI components (, , , ) for the Chullz 3-board variant and resolving backend dependency conflicts.
+    - Status: IN PROGRESS
+    - Agent Testing Done: N
+    - Which testing method agent to use?: both (Once the Chullz game table UI is wired up to the WebSockets, invoke both frontend and backend testing agents to verify the complex real-time multiplayer states).
+    - User Testing Done: N
+
+**All Pending/In progress Issue list**:
+  None. The backend environment issue ( vs ) was resolved.
+
+**In progress Task List**:
+  Task 1: Complete the Chullz Game Table UI Integration
+     - Where to resume: Modify the existing  (or create a new table route) to utilize the newly created components (, , etc.). 
+     - What will be achieved with this?: Players will be able to see all 3 community boards and use the custom raise controls (slider/buttons) based on the Pot Limit rules.
+     - Status: IN PROGRESS
+     - Should Test frontend/backend/both after fix?: both
+     - Blocked on something: None.
+
+**Upcoming and Future Tasks**:
+  Upcoming Tasks:
+  - **P0**: Implement WebSocket listeners in the frontend to handle the 3-board game state, betting actions, and Pot Limit constraints.
+  - **P0**: Implement the 1-Minute **Card Assignment UI Phase**. (Must allow players to drag-and-drop or tap to assign their 6 hole cards into 3 slots of 2 cards each, before the showdown).
+  - **P1**: Integrate real-time hand evaluation () to display the best 5-card hand preview while the user assigns cards to boards.
+  - **P1**: Implement the Showdown & Scoring Screen (evaluates 1 point per board, handles split pots, and awards total chips).
+  
+  Future Tasks:
+  - **P2**: Refine animations for card dealing, chip movements, and pot collection.
+
+**Completed work in this session**:
+- Basic Lobby, Auth, and 7 test profiles implementation (DONE - Phase 1)
+- Backend  architecture for 3 boards and Pot Limit rules (DONE)
+- Fixed / backend package collision (DONE)
+- Created frontend utility  (DONE)
+- Created frontend UI components , , ,  (DONE)
+
+**Earlier issues found/mentioned but not fixed**:
+  None
+
+**Known issue recurrence from previous fork**:
+  - Issue recurrence in previous fork: Bson vs PyMongo package collision ( import error).
+  - Recurrence count: 1
+  - Status: RESOLVED (Fixed by removing the standalone  package and keeping ).
+
+**Code Architecture**:
+- 
+  -  (FastAPI + WebSocket endpoints)
+  -  (Chullz 3-board game logic, pot calculations)
+- 
+  - , ,  (Navigation & Lobby)
+  -  (Main gameplay screen, needs update for Chullz)
+  -  (Contains newly created , , , )
+  -  (Evaluates best 5 out of 7 cards)
+
+**Key Technical Concepts**:
+React Native (Expo), WebSockets (Real-time Multiplayer), FastAPI, MongoDB, Pot Limit Poker Logic, Standard 5-card Hand Evaluation.
+
+**key DB schema**:
+  - : {username, pin, chips, avatar, role} - *Pre-seeded with 7 accounts*.
+
+**changes in tech stack**:
+  - Added  for Pot Limit bet sizing.
+
+**All files of reference**:
+  -  (Contains the new Chullz logic)
+  -  (Main backend server)
+  -  
+  - 
+  - 
+  - 
+  - 
+  -  (Current game screen, needs significant updates)
+
+**Areas that need refactoring**:
+  -  currently holds the Phase 1 basic table layout. It must be heavily modified to house the 3  components, 6 hole cards per player, and the complex Card Assignment drag/drop UI.
+
+**key api endpoints**:
+  - POST 
+  - GET 
+  - WS 
+
+**Critical Info for New Agent**:
+- **Rules Context:** The game is **Pot Limit** (custom buttons needed: 25%, 33%, 50%, 66%, 75%, 100% pot). There are **3 community boards**. Players are dealt **6 hole cards** and must assign 2 to each board.
+- **Card Assignment Phase:** This happens *after* the River round. Players have 1 minute to assign their cards. Provide a live preview of the hand they are making while they do this.
+- **Backend constraints:** Do NOT use Supabase. The user explicitly chose to stick with the existing FastAPI + WebSockets implementation.
+- **Testing:** 7 test accounts are available (e.g., AceKing/1111, BluffMaster/2222, TableAdmin/0000). Use them to test the multiplayer WebSockets.
+
+**documents and test reports created in this job**:
+  - 
+  - 
+
+**Last 10 User Messages and any pending HUMAN messages**:
+ 1. User provided betting rules: Pot Limit, minimum raise = 1BB or previous raise. Button presets: 25%, 33%, 50%, 66%, 75%, 100%. Custom text/slider input. (COMPLETED)
+ 2. User answered architecture questions: No Supabase needed. Ignore authentication phase for now (use test accounts). Keep PPPoker theme. Detail on card assignment (6 face-up cards, assign 2 to each board before showdown with 1 minute timer). (COMPLETED)
+ 3. User provided massive problem statement for Chullz - 3 board Texas Hold'em variant. (IN PROGRESS)
+
+**Project Health Check**:
+  - Backend: Healthy & Running
+  - Frontend: Healthy (but new features are partially implemented and not yet wired into the screen)
+  - Broken/Mocked: None.
+
+**3rd Party Integrations**: 
+  - None required.
+
+**Testing status**:
+  - Testing agent used after significant changes: YES (For Phase 1 MVP). NO (Not yet for Chullz Phase 2).
+  - Troubleshoot agent used after agent stuck in loop: NO
+  - Test files created: None
+  - Known regressions: None
+
+**Credentials to test flow**:
+  - AceKing: 
+  - BluffMaster: 
+  - CardShark: 
+  - PokerPro: 
+  - AllInAndy: 
+  - HighRoller: 
+  - TableAdmin: 
+
+**What agent forgot to execute**:
+The agent created the frontend UI components and the backend logic but hasn't yet integrated the components into the actual table screen () nor implemented the WebSockets logic on the frontend to handle the 3-board state and the unique Card Assignment interaction phase.</analysis>
