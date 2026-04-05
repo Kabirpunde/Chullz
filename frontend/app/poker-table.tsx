@@ -540,7 +540,7 @@ export default function PokerTable() {
         {!!isMyTurn && !!validActions && round !== 'waiting' && round !== 'showdown' && (
           <RaiseControl validActions={validActions} onAction={handleAction} pot={totalPot} />
         )}
-        {!isMyTurn && round !== 'waiting' && round !== 'showdown'
+        {!isMyTurn && round !== 'waiting' && round !== 'showdown' && round !== 'assignment'
           && myPlayer?.status === 'active' && (
           <View style={styles.notMyTurnBar}>
             <Text style={styles.notMyTurnTxt}>
