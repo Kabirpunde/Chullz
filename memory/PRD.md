@@ -60,6 +60,7 @@ Build "Chullz" — a real-time multiplayer Texas Hold'em variant with 3 independ
 - [x] 3 fixed backend bugs: turn rotation, heads-up blind assignment, WS player-join sync
 - [x] Card redesign: centered rank+suit, suit color-coding (red/blue/green/dark), no corner numbers
 - [x] AssignmentPanel: vertical board rows (full-width stacked), no horizontal scroll
+- [x] Portrait oval table layout: All 3 boards stacked vertically INSIDE the green felt, seats around perimeter using math-based positioning, ZONE_W wider than oval to prevent side-seat clipping. Testing confirmed: portrait ratio 1.74, all 3 boards visible without scrolling, FLOP/TURN/RIVER card reveals working, Assignment panel with 3 rows verified. (April 2026)
 
 ### P1 — Remaining (Next Phase)
 - [ ] Showdown overlay: full end-to-end test with both players completing assignment
