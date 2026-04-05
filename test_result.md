@@ -177,14 +177,17 @@ frontend:
     file: "/app/frontend/app/poker-table.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Full poker table with WS connection, player list, community boards, hole cards, action bar, start game button. Visually verified in waiting state."
       - working: "NA"
         agent: "main"
-        comment: "LAYOUT REDESIGN: Moved 3 community boards OUTSIDE the oval table (below it) so all 3 are always visible without scrolling. Oval table now compact (90px, just shows pot/branding). BoardsSection shows 3 columns side by side below oval using tiny-size cards (22x30). OpponentsRow changed to horizontal ScrollView. PlayingCard got new tiny size. Visually verified waiting state looks correct."
+        comment: "LAYOUT REDESIGN v3: Portrait oval table. 3 community boards (xs-size cards) stacked vertically INSIDE the oval felt with a divider between each board. Seats use seatPos() with ZONE_W (oval+seat_width) for correct perimeter placement. TABLE_W = 72% of winW, TABLE_H = max(400, 58% winH). Screenshot verified: boards visible, BluffMaster at top, AceKing at bottom, hole cards below oval. User reported UI was wrong - fixed to vertical portrait oval."
+      - working: true
+        agent: "testing"
+        comment: "FULLY VERIFIED: Portrait oval confirmed (281x490px, ratio 1.74). All 3 boards stacked vertically inside green felt (15 xs-size cards at all times). BluffMaster at top, AceKing at bottom via seatPos() math. 6 hole cards below oval. Betting actions (FOLD/CALL/RAISE/ALL IN) work. Board card reveals: FLOP=9 face-up, TURN=12 face-up, RIVER=15 face-up. Assignment panel shows B1/B2/B3 rows vertically stacked. Full game loop tested successfully."
 
   - task: "3 Community Boards display (CommunityBoard component)"
     implemented: true
@@ -314,3 +317,31 @@ agent_communication:
       6. Verify hole cards at bottom (6 cards) look clean and readable
       
       Use localhost:3000 (preview URL unavailable). Login via testID profile-card clicks + numpad-btn-{n}.
+  - agent: "main"
+    message: |
+      LATEST UPDATE - Vertical Portrait Oval Table Layout Fix:
+      
+      User reported the table UI was wrong. Fixed poker-table.tsx to show:
+      1. Portrait oval table (tall/vertical, 72% of screen width, 58% of screen height)
+      2. ALL 3 community boards (Board 1, Board 2, Board 3) stacked vertically INSIDE the oval green felt
+         - Each board row shows 5 xs-size cards (30x40px) with a colored numbered circle label
+         - Boards separated by a subtle horizontal divider line
+      3. Player seats correctly positioned around the oval perimeter using math (not hardcoded)
+         - Top seat, upper-left, upper-right, lower-left, lower-right, bottom-center (me)
+         - Container (ZONE_W) is wider than the oval by one seat width to prevent overflow
+      4. FeltBoardRow redesigned: circular board label (1/2/3) + xs-size cards
+      5. Hole cards (6 cards, md-size) displayed below the table
+
+      CONFIRMED WORKING via screenshot: Game started with AceKing + BluffMaster.
+      PRE-FLOP state showed: BluffMaster seat top, AceKing seat bottom, 3 board rows visible with face-down cards, 6 hole cards below, POT and BET badges inside felt.
+      
+      TEST FOCUS FOR THIS SESSION:
+      1. Create a 2-player game (AceKing host PIN=1111, BluffMaster joins PIN=2222) 
+      2. Start game - verify portrait oval with 3 stacked boards inside the green felt
+      3. Play through betting rounds (call/fold) 
+      4. Verify boards reveal cards (flop=3 cards, turn=4, river=5)
+      5. Card assignment panel should appear after river (60s timer, 3 board rows)
+      6. Showdown overlay should appear
+      
+      Use credentials: AceKing=1111, BluffMaster=2222, TableAdmin=0000
+      Test at localhost:3000

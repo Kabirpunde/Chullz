@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Dimensions,
+  ActivityIndicator, Dimensions, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,7 +12,33 @@ import RaiseControl from '../components/RaiseControl';
 import AssignmentPanel, { Assignment } from '../components/AssignmentPanel';
 import ShowdownOverlay from '../components/ShowdownOverlay';
 
-const { width } = Dimensions.get('window');
+// Static fallback for module-level constants (overridden per component render)
+const _dims = Dimensions.get('window'); // fallback only
+
+// Seat angles around the oval (degrees)
+// -90=top, -150=upper-left, -30=upper-right, 150=lower-left, 30=lower-right
+const SEAT_ANGLES = [-90, -150, -30, 150, 30] as const;
+const EMPTY_BOARDS: BoardState[] = [
+  { board_id: 1, flop: [], turn: '', river: '' },
+  { board_id: 2, flop: [], turn: '', river: '' },
+  { board_id: 3, flop: [], turn: '', river: '' },
+];
+const SEAT_W = 72;
+const SEAT_H = 94;
+
+// Compute seat position on the oval perimeter.
+// contW: the full container width (wider than oval to accommodate side seats)
+function seatPos(angleDeg: number, tW: number, tH: number, contW: number) {
+  const rad = (angleDeg * Math.PI) / 180;
+  // Center of the oval within the container
+  const cx = contW / 2;
+  const cy = SEAT_H / 2 + 2 + tH / 2;   // top=SEAT_H/2+2 is where oval top starts
+  const rx = tW / 2;
+  const ry = tH / 2;
+  const x = cx + rx * Math.cos(rad);
+  const y = cy + ry * Math.sin(rad);
+  return { left: Math.round(x - SEAT_W / 2), top: Math.round(y - SEAT_H / 2) };
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface PublicPlayer {
@@ -155,44 +181,34 @@ const emptyStyle = StyleSheet.create({
   label: { fontSize: 9, color: '#334155' },
 });
 
-function MiniCommunityBoard({ board, idx, round }: { board: BoardState; idx: number; round: string }) {
+// Board row rendered INSIDE the oval felt — full-width horizontal strip of 5 cards
+function FeltBoardRow({ board, idx, round }: { board: BoardState; idx: number; round: string }) {
   const color = BOARD_COLORS[idx];
   const community: (string | null)[] = [
-    ...(board.flop ?? []),
-    board.turn || null, board.river || null,
+    ...(board.flop ?? []), board.turn || null, board.river || null,
   ];
   const showCount = round === 'preflop' ? 0 : round === 'flop' ? 3 : round === 'turn' ? 4 : 5;
-
   return (
-    <View style={[miniBoard.wrap, { borderTopColor: color, borderTopWidth: 2 }]}>
-      <Text style={[miniBoard.label, { color }]}>{BOARD_NAMES[idx]}</Text>
-      {/* Flop row */}
-      <View style={miniBoard.cardsRow}>
-        {[0, 1, 2].map(i => (
-          <PlayingCard key={i} card={community[i] ?? undefined} faceDown={i >= showCount} size="tiny" />
-        ))}
+    <View style={feltRow.row}>
+      <View style={[feltRow.label, { backgroundColor: color + '30', borderColor: color }]}>
+        <Text style={[feltRow.labelTxt, { color }]}>{idx + 1}</Text>
       </View>
-      {/* Turn + River */}
-      <View style={miniBoard.cardsRow}>
-        {[3, 4].map(i => (
-          <PlayingCard key={i} card={community[i] ?? undefined} faceDown={i >= showCount} size="tiny" />
+      <View style={feltRow.cards}>
+        {[0, 1, 2, 3, 4].map(i => (
+          <PlayingCard key={i} card={community[i] ?? undefined} faceDown={i >= showCount} size="xs" />
         ))}
-        <View style={{ width: 22 }} />
       </View>
     </View>
   );
 }
-const miniBoard = StyleSheet.create({
-  wrap: {
-    flex: 1, alignItems: 'center',
-    paddingHorizontal: 4, paddingVertical: 6,
-    backgroundColor: '#071020',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#1e293b',
+const feltRow = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  label: {
+    width: 18, height: 18, borderRadius: 9, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  label: { fontSize: 8, fontWeight: '900', letterSpacing: 0.5, marginBottom: 4, textTransform: 'uppercase' },
-  cardsRow: { flexDirection: 'row', gap: 2, marginBottom: 2 },
+  labelTxt: { fontSize: 9, fontWeight: '900' },
+  cards: { flexDirection: 'row', gap: 4 },
 });
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -201,6 +217,17 @@ export default function PokerTable() {
   const isHost = isHostParam === 'true';
   const { user, token, backendUrl } = useAuth();
   const router = useRouter();
+
+  // ── Responsive layout (portrait oval) ────────────────────────────────────
+  const { width: winW, height: winH } = useWindowDimensions();
+  // Table oval: 72% of screen width, 56% of screen height (min 400px tall)
+  const TABLE_W  = Math.round(Math.min(winW, 420) * 0.72);
+  const TABLE_H  = Math.round(Math.max(400, Math.min(winH, 900) * 0.58));
+  // Zone = container that holds the oval + side seats on both edges
+  const ZONE_W   = TABLE_W + SEAT_W + 8;    // wider than oval so side seats don't clip
+  const ZONE_H   = TABLE_H + SEAT_H + 8;    // taller for top/bottom seats
+  const OVAL_OFF = Math.round((ZONE_W - TABLE_W) / 2);  // oval left offset
+  const MY_POS   = seatPos(90, TABLE_W, TABLE_H, ZONE_W);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectCountRef = useRef(0);
@@ -375,116 +402,121 @@ export default function PokerTable() {
           submitting={submitting}
         />
       ) : (
-        <View style={styles.gameArea}>
-          {/* ── Opponents Row (horizontal scroll) ── */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.opponentsRow}
-            contentContainerStyle={styles.opponentsRowContent}
-          >
-            {opponents.map(p => (
-              <OpponentSeat
-                key={p.user_id}
-                player={p}
-                isCurrentTurn={p.seat === gameState?.current_seat}
-                isDealer={round !== 'waiting' && p.seat === gameState?.dealer_seat}
-                isSB={round !== 'waiting' && p.seat === gameState?.sb_seat}
-                isBB={round !== 'waiting' && p.seat === gameState?.bb_seat}
-              />
-            ))}
-            {Array(emptySeatsToShow).fill(0).map((_, i) => (
-              <EmptySeat key={`empty-${i}`} />
-            ))}
-          </ScrollView>
+        <View style={styles.gameWrapper}>
 
-          {/* ── OVAL TABLE ── */}
-          <View style={styles.tableOuter}>
-            {/* Wood rail */}
-            <View style={styles.tableRail}>
-              {/* Felt surface */}
-              <View style={styles.tableFelt}>
-                {/* Pot + Bet */}
-                <View style={styles.potArea}>
-                  {totalPot > 0 ? (
+          {/* TABLE CONTAINER (oval + absolute seats) */}
+          <View style={[styles.tableContainer, { width: ZONE_W, height: ZONE_H }]}>
+
+            {/* ── THE OVAL ── */}
+            <View style={[styles.tableOuter, {
+              top: SEAT_H / 2 + 2, left: OVAL_OFF, width: TABLE_W, height: TABLE_H,
+              borderRadius: TABLE_W / 2,
+            }]}>
+              <View style={[styles.tableRail, { borderRadius: TABLE_W / 2 - 6 }]}>
+                <View style={[styles.tableFelt, { borderRadius: TABLE_W / 2 - 13 }]}>
+
+                  {/* Pot badge */}
+                  {totalPot > 0 && (
                     <View style={styles.potBadge}>
                       <Text style={styles.potLbl}>POT</Text>
                       <Text style={styles.potVal}>{totalPot.toLocaleString()} 🪙</Text>
                     </View>
-                  ) : (
-                    <Text style={styles.gameTitle}>♠ CHULLZ</Text>
                   )}
                   {(gameState?.current_bet ?? 0) > 0 && (
                     <View style={styles.betBadge}>
                       <Text style={styles.betLbl}>BET {gameState!.current_bet.toLocaleString()}</Text>
                     </View>
                   )}
+
+                  {/* 3 community board rows — stacked vertically inside felt */}
+                  {round !== 'waiting' && (
+                    <View style={styles.boardsInFelt}>
+                      {(boards.length > 0 ? boards : EMPTY_BOARDS).map((board, idx) => (
+                        <View key={board.board_id}>
+                          {idx > 0 && <View style={styles.boardDivider} />}
+                          <FeltBoardRow board={board} idx={idx} round={round} />
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Waiting felt content */}
+                  {round === 'waiting' && (
+                    <View style={styles.waitingFelt}>
+                      <Text style={styles.gameTitle}>♠ CHULLZ</Text>
+                      <Text style={styles.waitingFeltSub}>3 Board Pot Limit</Text>
+                      <Text style={styles.waitingFeltPlayers}>
+                        {gameState ? `${gameState.players.length} / ${maxPlayers} players` : '…'}
+                      </Text>
+                    </View>
+                  )}
+
                 </View>
-                {round === 'waiting' && (
-                  <View style={styles.waitingTableContent}>
-                    <Text style={styles.waitingTableTxt}>
-                      {gameState ? `${gameState.players.length}/${maxPlayers} players` : 'Connecting...'}
-                    </Text>
-                    <Text style={styles.waitingTableSub}>3 board Pot Limit poker</Text>
-                  </View>
-                )}
               </View>
             </View>
-          </View>
 
-          {/* ── 3 Community Boards (below oval, always all visible) ── */}
-          {round !== 'waiting' && (
-            <View style={styles.boardsSection}>
-              {(boards.length > 0 ? boards : [
-                { board_id: 1, flop: [], turn: '', river: '' },
-                { board_id: 2, flop: [], turn: '', river: '' },
-                { board_id: 3, flop: [], turn: '', river: '' },
-              ]).map((board, idx) => (
-                <MiniCommunityBoard key={board.board_id} board={board} idx={idx} round={round} />
-              ))}
-            </View>
-          )}
-
-          {/* ── My Seat ── */}
-          <View style={styles.mySeatRow}>
-            {myPlayer ? (
-              <View style={styles.mySeat}>
-                <View style={[styles.myAvatar,
-                  { backgroundColor: (myPlayer.avatar_color || '#00f0ff') + '30',
-                    borderColor: (myPlayer.avatar_color || '#00f0ff'),
-                    borderWidth: isMyTurn ? 2.5 : 1.5 }]}>
-                  <Text style={styles.myAvatarEmoji}>{myPlayer.avatar}</Text>
-                  {isMyTurn && <View style={styles.myTurnRing} />}
-                </View>
-                <View style={styles.myInfo}>
-                  <Text style={styles.myName}>{myPlayer.username}</Text>
-                  <Text style={styles.myChips}>🪙 {myPlayer.chips.toLocaleString()}</Text>
-                </View>
-                <View style={styles.myBadges}>
-                  {round !== 'waiting' && myPlayer.seat === gameState?.dealer_seat && <SeatBadge label="D" color="#ffb800" />}
-                  {round !== 'waiting' && myPlayer.seat === gameState?.sb_seat && <SeatBadge label="SB" color="#3b82f6" />}
-                  {round !== 'waiting' && myPlayer.seat === gameState?.bb_seat && <SeatBadge label="BB" color="#22c55e" />}
-                  {myPlayer.status !== 'active' && round !== 'waiting' && (
-                    <SeatBadge
-                      label={myPlayer.status.toUpperCase()}
-                      color={STATUS_COLOR[myPlayer.status] ?? '#475569'}
+            {/* ── OPPONENT SEATS (absolute, around oval perimeter) ── */}
+            {SEAT_ANGLES.map((angle, idx) => {
+              const pos = seatPos(angle, TABLE_W, TABLE_H, ZONE_W);
+              const player = opponents[idx];
+              return (
+                <View key={idx} style={[styles.absSeat, { left: pos.left, top: pos.top }]}>
+                  {player ? (
+                    <OpponentSeat
+                      player={player}
+                      isCurrentTurn={player.seat === gameState?.current_seat}
+                      isDealer={round !== 'waiting' && player.seat === gameState?.dealer_seat}
+                      isSB={round !== 'waiting' && player.seat === gameState?.sb_seat}
+                      isBB={round !== 'waiting' && player.seat === gameState?.bb_seat}
                     />
+                  ) : (
+                    <EmptySeat />
                   )}
                 </View>
-                {myPlayer.bet_street > 0 && (
-                  <View style={styles.myBetBadge}>
-                    <Text style={styles.myBetTxt}>{myPlayer.bet_street.toLocaleString()}</Text>
-                  </View>
-                )}
-              </View>
-            ) : (
-              <View style={styles.spectatorRow}>
-                <Text style={styles.spectatorTxt}>👀 Spectating</Text>
-              </View>
-            )}
-          </View>
+              );
+            })}
 
-          {/* ── My Hole Cards ── */}
+            {/* ── MY SEAT (bottom centre of oval) ── */}
+            <View style={[styles.absSeat, { left: MY_POS.left, top: MY_POS.top }]}>
+              {myPlayer ? (
+                <View style={[
+                  styles.mySeat,
+                  { borderColor: isMyTurn ? '#ffb800' : (myPlayer.avatar_color || '#00f0ff') + '50' },
+                ]}>
+                  <View style={[styles.myAvatar, {
+                    backgroundColor: (myPlayer.avatar_color || '#00f0ff') + '20',
+                    borderColor: myPlayer.avatar_color || '#00f0ff',
+                    borderWidth: isMyTurn ? 2.5 : 1.5,
+                  }]}>
+                    <Text style={styles.myAvatarEmoji}>{myPlayer.avatar}</Text>
+                    {isMyTurn && <View style={styles.myTurnRing} />}
+                  </View>
+                  <Text style={styles.myName} numberOfLines={1}>{myPlayer.username}</Text>
+                  <Text style={styles.myChips}>{myPlayer.chips.toLocaleString()}</Text>
+                  <View style={styles.myBadges}>
+                    {round !== 'waiting' && myPlayer.seat === gameState?.dealer_seat && <SeatBadge label="D" color="#ffb800" />}
+                    {round !== 'waiting' && myPlayer.seat === gameState?.sb_seat && <SeatBadge label="SB" color="#3b82f6" />}
+                    {round !== 'waiting' && myPlayer.seat === gameState?.bb_seat && <SeatBadge label="BB" color="#22c55e" />}
+                    {myPlayer.status !== 'active' && round !== 'waiting' && (
+                      <SeatBadge label={myPlayer.status.toUpperCase()} color={STATUS_COLOR[myPlayer.status] ?? '#475569'} />
+                    )}
+                  </View>
+                  {myPlayer.bet_street > 0 && (
+                    <View style={styles.myBetBadge}>
+                      <Text style={styles.myBetTxt}>{myPlayer.bet_street.toLocaleString()}</Text>
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.spectatorRow}>
+                  <Text style={styles.spectatorTxt}>👀</Text>
+                </View>
+              )}
+            </View>
+
+          </View>{/* /tableContainer */}
+
+          {/* ── MY HOLE CARDS (below oval) ── */}
           {holeCards.length > 0 && round !== 'waiting' && (
             <View style={styles.holeCardsRow}>
               {holeCards.map((c, i) => (
@@ -493,9 +525,9 @@ export default function PokerTable() {
             </View>
           )}
 
-          {/* ── Waiting: player list in table ── */}
+          {/* ── WAITING: player list ── */}
           {round === 'waiting' && (
-            <ScrollView style={styles.waitingScroll} showsVerticalScrollIndicator={false}>
+            <ScrollView style={[styles.waitingScroll, { width: TABLE_W }]} showsVerticalScrollIndicator={false}>
               {(gameState?.players ?? []).map(p => (
                 <View key={p.user_id} style={styles.waitingPlayerRow}>
                   <Text style={styles.wpAvatar}>{p.avatar}</Text>
@@ -514,8 +546,9 @@ export default function PokerTable() {
               )}
             </ScrollView>
           )}
+
         </View>
-      )}
+      )}  
 
       {/* ── Action Bar ── */}
       <View style={styles.actionBar}>
@@ -575,16 +608,13 @@ export default function PokerTable() {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const TABLE_W = width - 24;
-const TABLE_H = 90;
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#060b14' },
   errTxt: { color: '#ffffff', textAlign: 'center', marginTop: 60, fontSize: 16 },
   errBack: { alignSelf: 'center', marginTop: 16 },
   errBackTxt: { color: '#00f0ff', fontSize: 15, fontWeight: '700' },
 
-  // Top bar
+  // ── Top bar ────────────────────────────────────────────────────────────────
   topBar: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 12, paddingVertical: 10,
@@ -596,7 +626,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#131a2a', alignItems: 'center', justifyContent: 'center',
   },
   topCenter: { flex: 1, alignItems: 'center', gap: 3 },
-  tableName: { fontSize: 14, fontWeight: '800', color: '#ffffff', maxWidth: width - 170 },
+  tableName: { fontSize: 14, fontWeight: '800', color: '#ffffff', maxWidth: 200 },
   roundPill: { paddingHorizontal: 10, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
   roundLbl: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -604,126 +634,138 @@ const styles = StyleSheet.create({
   blindsLbl: { fontSize: 9, color: '#334155', fontWeight: '600' },
   wsOrb: { width: 8, height: 8, borderRadius: 4 },
 
-  // Timer
+  // ── Timer bar ──────────────────────────────────────────────────────────────
   timerBar: { height: 5, backgroundColor: '#1e293b', position: 'relative', justifyContent: 'center' },
   timerFill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 3 },
   timerLbl: { position: 'absolute', right: 8, fontSize: 8, color: '#ffffff60', fontWeight: '700' },
 
-  // Game area
-  gameArea: { flex: 1, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4 },
+  // ── Game wrapper ───────────────────────────────────────────────────────────
+  gameWrapper: {
+    flex: 1,
+    alignItems: 'center',
+    paddingTop: 6,
+    paddingBottom: 4,
+  },
 
-  // Opponents (horizontal scroll)
-  opponentsRow: { maxHeight: 92, marginBottom: 6 },
-  opponentsRowContent: { flexDirection: 'row', alignItems: 'center', paddingVertical: 2, gap: 0 },
+  // ── Table container (oval + seats, seats can overflow) ─────────────────────
+  tableContainer: {
+    position: 'relative',
+    // width and height supplied as inline style (responsive)
+  },
 
-  // Oval Table (compact — just shows pot)
+  // ── The outer oval (wood border) ───────────────────────────────────────────
   tableOuter: {
-    alignSelf: 'center',
-    width: TABLE_W,
-    height: TABLE_H,
-    borderRadius: TABLE_H / 2,
-    backgroundColor: '#7c3f0a',
-    padding: 5,
-    shadowColor: '#00f0ff',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 10,
-    marginBottom: 6,
+    position: 'absolute',
+    // top, left, width, height, borderRadius supplied inline
+    backgroundColor: '#6b3308',       // dark wood
+    padding: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 12,
   },
   tableRail: {
     flex: 1,
-    borderRadius: (TABLE_H - 10) / 2,
-    backgroundColor: '#a0612b',
-    padding: 6,
+    // borderRadius supplied inline
+    backgroundColor: '#9c5827',       // lighter wood rail
+    padding: 7,
   },
   tableFelt: {
     flex: 1,
-    borderRadius: (TABLE_H - 22) / 2,
-    backgroundColor: '#0d4025',
+    // borderRadius supplied inline
+    backgroundColor: '#0e4a26',       // dark green felt
     borderWidth: 1,
-    borderColor: '#1a6040',
+    borderColor: '#1a6535',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    gap: 4,
+    gap: 10,
     overflow: 'hidden',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
   },
 
-  // Pot area
-  potArea: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
+  // ── Pot / bet inside felt ──────────────────────────────────────────────────
   potBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#00000030',
-    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#00000035',
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 4,
     borderWidth: 1, borderColor: '#ffffff15',
   },
-  potLbl: { fontSize: 8, color: '#ffb800', fontWeight: '900', letterSpacing: 1 },
-  potVal: { fontSize: 14, fontWeight: '900', color: '#ffb800' },
+  potLbl: { fontSize: 9, color: '#ffb800', fontWeight: '900', letterSpacing: 1 },
+  potVal: { fontSize: 16, fontWeight: '900', color: '#ffb800' },
   betBadge: {
-    backgroundColor: '#3b82f625', borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderWidth: 1, borderColor: '#3b82f650',
+    backgroundColor: '#3b82f620', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 3,
+    borderWidth: 1, borderColor: '#3b82f640',
   },
-  betLbl: { fontSize: 10, color: '#3b82f6', fontWeight: '800' },
-  gameTitle: { fontSize: 18, fontWeight: '900', color: '#00f0ff', letterSpacing: 3 },
+  betLbl: { fontSize: 11, color: '#3b82f6', fontWeight: '800' },
 
-  // 3 Community Boards — outside the oval, always fully visible
-  boardsSection: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 6,
+  // ── 3 community boards stacked inside felt ─────────────────────────────────
+  boardsInFelt: {
+    alignItems: 'flex-start',
+    gap: 0,
+    width: '100%',
+  },
+  boardDivider: {
+    height: 1,
+    backgroundColor: '#1a6535',
+    marginVertical: 8,
+    width: '100%',
   },
 
-  // Waiting table content
-  waitingTableContent: { alignItems: 'center', gap: 2 },
-  waitingTableTxt: { fontSize: 13, fontWeight: '800', color: '#ffffff' },
-  waitingTableSub: { fontSize: 9, color: '#6b9e7a', letterSpacing: 1 },
+  // ── Waiting felt content ───────────────────────────────────────────────────
+  waitingFelt: { alignItems: 'center', gap: 6 },
+  gameTitle: { fontSize: 22, fontWeight: '900', color: '#00f0ff', letterSpacing: 4 },
+  waitingFeltSub: { fontSize: 10, color: '#6b9e7a', letterSpacing: 1.5, fontWeight: '700' },
+  waitingFeltPlayers: { fontSize: 13, color: '#94a3b8', fontWeight: '600' },
 
-  // My seat
-  mySeatRow: {
-    marginTop: 4, alignItems: 'center',
+  // ── Absolute seat wrapper ─────────────────────────────────────────────────
+  absSeat: {
+    position: 'absolute',
+    width: SEAT_W,
+    // height is content-driven
+    zIndex: 10,
   },
+
+  // ── My seat (at bottom of oval) ────────────────────────────────────────────
   mySeat: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#0d1520', borderRadius: 16,
-    borderWidth: 1.5, borderColor: '#1e3a5a',
-    paddingHorizontal: 14, paddingVertical: 8,
-    alignSelf: 'center',
+    width: SEAT_W,
+    backgroundColor: '#0d1520',
+    borderRadius: 12, borderWidth: 2,
+    paddingVertical: 6, paddingHorizontal: 4,
+    alignItems: 'center', gap: 2,
   },
   myAvatar: {
-    width: 42, height: 42, borderRadius: 21,
+    width: 38, height: 38, borderRadius: 19,
     alignItems: 'center', justifyContent: 'center',
     position: 'relative',
   },
-  myAvatarEmoji: { fontSize: 22 },
+  myAvatarEmoji: { fontSize: 20 },
   myTurnRing: {
-    position: 'absolute', top: -3, left: -3, right: -3, bottom: -3,
-    borderRadius: 25, borderWidth: 2, borderColor: '#ffb800',
+    position: 'absolute', top: -4, left: -4, right: -4, bottom: -4,
+    borderRadius: 24, borderWidth: 2, borderColor: '#ffb800',
   },
-  myInfo: { flex: 1 },
-  myName: { fontSize: 13, fontWeight: '800', color: '#ffffff' },
-  myChips: { fontSize: 11, color: '#ffb800', fontWeight: '600', marginTop: 1 },
-  myBadges: { flexDirection: 'row', gap: 3, flexWrap: 'wrap' },
+  myName: { fontSize: 9, fontWeight: '800', color: '#ffffff', textAlign: 'center', maxWidth: 64 },
+  myChips: { fontSize: 8, color: '#ffb800', fontWeight: '600' },
+  myBadges: { flexDirection: 'row', gap: 2, flexWrap: 'wrap', justifyContent: 'center' },
   myBetBadge: {
-    backgroundColor: '#3b82f625', borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 3,
+    backgroundColor: '#3b82f625', borderRadius: 7,
+    paddingHorizontal: 6, paddingVertical: 1,
     borderWidth: 1, borderColor: '#3b82f650',
   },
-  myBetTxt: { fontSize: 10, color: '#3b82f6', fontWeight: '800' },
-
+  myBetTxt: { fontSize: 8, color: '#3b82f6', fontWeight: '800' },
   spectatorRow: { paddingVertical: 8, alignItems: 'center' },
-  spectatorTxt: { fontSize: 12, color: '#475569' },
+  spectatorTxt: { fontSize: 18 },
 
-  // Hole cards — single row of 6
+  // ── My hole cards (below oval) ─────────────────────────────────────────────
   holeCardsRow: {
     flexDirection: 'row', justifyContent: 'center',
-    gap: 5, marginTop: 8,
+    gap: 6, marginTop: 8,
   },
 
-  // Waiting player list
-  waitingScroll: { marginTop: 8, maxHeight: 140 },
+  // ── Waiting player list ────────────────────────────────────────────────────
+  waitingScroll: { maxHeight: 150, marginTop: 4 },
   waitingPlayerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: '#131a2a', borderRadius: 10,
@@ -738,7 +780,7 @@ const styles = StyleSheet.create({
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 16, justifyContent: 'center' },
   loadingTxt: { fontSize: 13, color: '#475569' },
 
-  // Action bar
+  // ── Action bar ────────────────────────────────────────────────────────────
   actionBar: {
     paddingHorizontal: 16, paddingVertical: 10,
     backgroundColor: '#0a0f1a',
@@ -765,3 +807,4 @@ const styles = StyleSheet.create({
   statusBar: { paddingVertical: 11, alignItems: 'center' },
   statusTxt: { fontSize: 14, fontWeight: '900', letterSpacing: 2 },
 });
+

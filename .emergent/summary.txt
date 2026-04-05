@@ -4,124 +4,121 @@ Key Rules:
 - 3 independent community boards (Flop, Turn, River each). 
 - Players are dealt 6 hole cards and must assign exactly 2 hole cards to each of the 3 boards during a 1-minute Card Assignment Phase.
 - Pot Limit betting rules.
-- 1 point per board won.
 - Tech Setup: FastAPI + WebSockets backend, React Native (Expo) frontend. Use 7 pre-seeded test accounts and maintain a dark PPPoker theme.
-*Latest User Request:* After the initial implementation of the Phase 2 UI, the user asked, Where did the table and seats go? instructing the agent to bring back the visual oval green felt table with player seats positioned around it.
+*Latest User Request & Product Requirements:* The user complained the UI is still incorrect and uploaded a mockup. The required layout MUST be a long vertical (portrait) oval table. All 3 community boards must be fully visible and vertically stacked one on top of the other *inside* the table felt. Player seats must be positioned along the edges of the table.
 
 **User's preferred language**: English
 *(INSTRUCTING NEXT AGENT: You MUST respond in English only)*
 
 **what currently exists?**: 
-The complete Chullz multiplayer logic (3 boards, Pot Limit, card assignment, showdown evaluation) is fully implemented in the backend and passed 100% of the testing agent's E2E checks. The frontend components (, , , , ) are built and connected. However, during integration, the visual green oval table was removed. The agent has just rewritten  to restore the green felt table and seat positions, but has not yet tested the visual outcome.
+The complete game logic, WebSockets state management, and betting features are fully functional. The  component has been successfully redesigned to feature a centered rank+suit with suit-specific coloring. The  has also been updated to show vertically stacked boards. Currently, the agent has just completely rewritten the layout of  replacing static  with a dynamic  layout to construct a tall portrait oval table with absolutely positioned seats and 3 vertically stacked internal community boards.
 
 **Last working item**:
-    - Last item agent was working: Restoring the visual oval green felt table and player seats layout in  to satisfy the user's latest feedback.
+    - Last item agent was working: Redesigning the  view to match the user's vertical mockup (tall portrait oval, vertically stacked boards, perimeter seating). The agent updated dimensions and inline styling, then just triggered a screenshot of the new layout.
     - Status: TESTING PENDING
-    - Agent Testing Done: N (for the latest visual rewrite)
-    - Which testing method agent to use?: Frontend testing agent and/or screenshot tool (to visually verify the new layout).
+    - Agent Testing Done: N (Screenshot taken, but analysis is pending)
+    - Which testing method agent to use?: Screenshot tool (to visually verify the new vertical layout and seating coordinates).
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  Issue 1: Missing visual oval table and player seats on the Poker Table screen.
-     - Attempted fixes: The agent just used  to completely rewrite  to reintroduce absolute positioning for seats around an oval UI element.
+  Issue 1: Poker Table Layout Redesign (Vertical Oval & Stacked Boards)
+     - Attempted fixes: Refactored  to replace  with . Rebuilt the table container, seats positioning, and board rows with dynamic inline styles to enforce a tall portrait oval with vertically stacked boards.
      - Next debug checklist: 
-       1. Restart the Expo server (expo: ERROR (not running)
-expo: started).
-       2. Navigate to a table and use the screenshot tool to visually confirm that the green oval table renders correctly.
-       3. Ensure the 3 community boards, assignment panel, and player seats do not overlap and the layout is thumb-friendly.
-     - Why fix this issue and what will be achieved with the fix?: The user explicitly complained that the poker table visual was missing. Fixing it restores the expected PPPoker-style app experience.
-     - Status: TESTING PENDING
-     - Is recurring issue?: N
+       1. View the latest screenshot taken on . 
+       2. Visually verify: Is the table a vertical oval? Are all 3 boards stacked vertically inside the felt? Are player seats correctly positioned on the perimeter without overlapping the boards?
+       3. Adjust the  absolute positioning of the seats if they look misaligned.
+     - Why fix this issue and what will be achieved with the fix?: The user explicitly provided a mockup and demanded the vertical layout. Fixing it aligns the app with the exact requested visual specifications.
+     - Status: IN PROGRESS / TESTING PENDING
+     - Is recurring issue?: Y (UI layout iterates frequently)
      - Should Test frontend/backend/both after fix?: Frontend
      - Blocked on other issue: None
 
 **In progress Task List**:
-  Task 1: Visually verify the newly restored Poker Table UI
-     - Where to resume: Restart frontend, log in using test credentials (custom PIN pad), join a table, and take a screenshot.
-     - What will be achieved with this?: Ensures the code written in the last step actually solves the user's visual UI complaint without breaking game functionality.
+  Task 1: Visual Verification of Portrait Oval Table
+     - Where to resume: The last tool call was . Review the image returned by that call. If the layout matches the user's mockup constraints, finish the task. Otherwise, tweak the positioning logic in .
+     - What will be achieved with this?: Finalizing the core aesthetic of the main gameplay screen.
      - Status: TESTING PENDING
      - Should Test frontend/backend/both after fix?: Frontend
      - Blocked on something: None
 
 **Upcoming and Future Tasks**:
     Future Tasks:
-    - P2: Refine animations for card dealing, chip movements, and pot collection.
+    - P2: Add card dealing animations and chip movement animations.
+    - P2: Implement a quick-assign button (Auto-Assign Best) for optimal hole-card assignment logic (Agent suggestion).
+    - P2: Add a hand history log for player review (Agent suggestion).
 
 **Completed work in this session**:
-- Integrated WebSocket listeners to handle the 3-board game state, betting actions, and Pot Limit constraints in the frontend (DONE)
-- Implemented the 1-Minute Card Assignment UI Phase via  (DONE)
-- Integrated real-time hand evaluation for best 5-card hand preview (DONE)
-- Implemented Showdown & Scoring Screen via  (DONE)
-- Fixed 3 critical backend state bugs discovered by the testing agent (DONE)
+- Redesigned  to remove corner numbers, use centered rank+suit, and implement suit coloring (Hearts=Red, Diamonds=Blue, Clubs=Green, Spades=Black) (DONE)
+- Refactored  to stack boards vertically and span full-width (DONE)
+- Fixed empty username string  display cosmetic bug in action bar (DONE)
+- Transferred dimension handling in  to the React  hook to prevent the table from rendering too wide (DONE)
 
 **Earlier issues found/mentioned but not fixed**:
-  None.
+  None
 
 **Known issue recurrence from previous fork**:
   - Issue recurrence in previous fork: Bson vs PyMongo package collision ( import error).
   - Recurrence count: 1
-  - Status: RESOLVED 
+  - Status: RESOLVED
 
 **Code Architecture**:
 - 
   -  (FastAPI + WebSocket endpoints)
   -  (Chullz 3-board game logic, pot calculations)
-  -  (Test suite)
 - 
   -  (Login with custom PIN pad)
   -  (Table creation and joining)
-  -  (Main gameplay screen, recently rewritten)
-  -  (, , , , , )
+  -  (Main gameplay screen, heavily refactored for layout)
+  -  (, , , )
   -  
 
 **Key Technical Concepts**:
-React Native (Expo), WebSockets (Real-time Multiplayer), FastAPI, MongoDB, Custom UI (Absolute positioning for seats around an oval table), Pot Limit Poker Logic.
+React Native (Expo), WebSockets (Real-time Multiplayer), FastAPI, MongoDB, Custom UI (Dynamic absolute positioning calculated via React  for perimeter seats).
 
 **key DB schema**:
   - : {username, pin, chips, avatar, role} - *Pre-seeded with 7 accounts*.
 
 **changes in tech stack**:
-  - None new.
+  - None.
 
 **All files of reference**:
-  -  (Heavily modified to restore oval table layout)
-  -  (Created this session)
-  -  (Created this session)
-  -  (Updated)
+  -  (Refactored extensively for vertical layout logic)
+  -  (Updated card UI)
+  -  (Updated layout logic)
+  - 
 
 **Areas that need refactoring**:
-  -  was just completely rewritten to include absolute positioning for seats. It needs careful visual inspection to ensure it scales correctly on mobile device screens without overlapping the 3 community boards.
+  - : The seat absolute coordinate mapping () currently embedded inline might need fine-tuning if the latest screenshot reveals misalignments around the portrait oval.
 
 **key api endpoints**:
   - WS 
 
 **Critical Info for New Agent**:
-- **Current State:** The backend logic and frontend integration are complete and functional. The only pending item is a visual UI fix. The user noticed that the visual table and seats disappeared when you built the Chullz UI. You have just written the code to restore it, but you MUST test it visually.
-- **Login Flow:** The app uses a custom numeric PIN pad UI. When testing, you have to find and click the individual number buttons (e.g., ).
-- **Testing:** Do not modify the backend; it passed extensive testing. Focus solely on frontend visual layout.
+- **Context:** You are right in the middle of a UI overhaul. The user rejected a previous horizontal design and provided a mockup demanding a **tall vertical (portrait) oval table**, with 3 community boards **vertically stacked inside** the table felt, and player seats positioned along the edges.
+- **Current State:** The code logic to render this has been pushed into  using dynamic  scaling. A screenshot was just triggered. Your first step should be evaluating the screenshot of the table to ensure the proportions, stacked boards, and player seat perimeters align.
+- **Login Flow:** The app utilizes a custom numeric PIN pad. Test users include AceKing () and BluffMaster ().
 
 **documents and test reports created in this job**:
   - 
   - 
-  -  (Testing agent report)
 
 **Last 10 User Messages and any pending HUMAN messages**:
- 1. User: Where did the table and seats go? (IN PROGRESS - Agent rewrote table to add it back, needs verification)
- 2. User: 1. Both 2. C decide 3. Build everything (COMPLETED - Full frontend integration was completed)
- 3. User confirmed ask_human to proceed with the build plan. (COMPLETED)
+ 1. User: Uploaded mockup image. You are still messing up the UI... Make the table long length wise, show each board... one below the other... We should see all users that are on the table at the edges... (IN PROGRESS - Agent refactored code and took screenshot to verify)
+ 2. User: yes. Make saure we can see all boards together. I had to scroll previously to see bnoard 2 and 3 (COMPLETED)
+ 3. User: Please use ask_human tool and confirm your plan now. (COMPLETED)
 
 **Project Health Check**:
   - Backend: Healthy & fully tested.
-  - Frontend: Undergoing visual restructuring.
+  - Frontend: Healthy, but in an unverified layout/visual state.
 
 **3rd Party Integrations**: 
   - None required.
 
 **Testing status**:
-  - Testing agent used after significant changes: YES (Fixed multiple backend state bugs).
-  - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: 
-  - Known regressions: Visual layout of the poker table was lost during component integration (currently being fixed).
+  - Testing agent used after significant changes: YES (Testing agent validated card styling and Assignment Panel layout previously).
+  - Troubleshoot agent used after agent stuck in loop: YES (Deployment agent fixed Expo tunnel loading issues earlier).
+  - Test files created: None this session.
+  - Known regressions: None functional; UI is pending visual verification.
 
 **Credentials to test flow**:
   - AceKing: 
@@ -129,4 +126,4 @@ React Native (Expo), WebSockets (Real-time Multiplayer), FastAPI, MongoDB, Custo
   - TableAdmin: 
 
 **What agent forgot to execute**:
-After rewriting  to restore the green oval table, the agent did not restart the Expo server and did not use the screenshot tool to verify that the table actually looks correct before the session ended.</analysis>
+The agent executed  to test the new dynamic portrait oval layout, but the session ended before the agent could view the returned screenshot image to verify if the seat and board absolute positions actually look correct on the screen.</analysis>
