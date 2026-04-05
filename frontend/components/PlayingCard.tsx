@@ -4,7 +4,7 @@ import { cardRank, cardSuit, isRed } from '../utils/handEvaluator';
 
 interface CardProps {
   card?: string;          // e.g. "Ah", null = face-down
-  size?: 'xs' | 'sm' | 'md' | 'lg';
+  size?: 'tiny' | 'xs' | 'sm' | 'md' | 'lg';
   selected?: boolean;
   assigned?: boolean;
   faceDown?: boolean;
@@ -12,6 +12,7 @@ interface CardProps {
 }
 
 const SIZES = {
+  tiny: { w: 22, h: 30, rank: 9, suit: 9, radius: 3 },
   xs: { w: 28, h: 38, rank: 10, suit: 10, radius: 4 },
   sm: { w: 36, h: 50, rank: 13, suit: 13, radius: 5 },
   md: { w: 46, h: 64, rank: 17, suit: 16, radius: 6 },
