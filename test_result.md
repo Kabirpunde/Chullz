@@ -182,6 +182,9 @@ frontend:
       - working: true
         agent: "main"
         comment: "Full poker table with WS connection, player list, community boards, hole cards, action bar, start game button. Visually verified in waiting state."
+      - working: "NA"
+        agent: "main"
+        comment: "LAYOUT REDESIGN: Moved 3 community boards OUTSIDE the oval table (below it) so all 3 are always visible without scrolling. Oval table now compact (90px, just shows pot/branding). BoardsSection shows 3 columns side by side below oval using tiny-size cards (22x30). OpponentsRow changed to horizontal ScrollView. PlayingCard got new tiny size. Visually verified waiting state looks correct."
 
   - task: "3 Community Boards display (CommunityBoard component)"
     implemented: true
@@ -282,3 +285,27 @@ agent_communication:
       After assignment: showdown overlay should display.
       
       All backend APIs are confirmed working from logs.
+  - agent: "main"
+    message: |
+      LATEST UPDATE - Visual Layout Redesign (user complaint: "had to scroll to see board 2 and 3"):
+      
+      Changes made:
+      1. poker-table.tsx: Moved 3 community boards OUTSIDE the oval (below it in boardsSection)
+         - All 3 boards now show as a horizontal row below the table (no scrolling needed)
+         - Oval table is now compact 90px, shows only pot/branding
+         - OpponentsRow changed to horizontal ScrollView (no more wrapping to 2 rows)
+         - PlayingCard.tsx: added 'tiny' size (22x30) for compact board cards
+      2. Layout verified in waiting state - green oval table is visible, no scrolling
+      
+      KEY: boardsSection ONLY shows when round !== 'waiting', so during an active game (preflop/flop/turn/river)
+      all 3 community boards appear below the oval table as equal-width columns.
+      
+      Test focus for this session: 
+      1. Verify waiting state: green oval visible, player seats visible, no scrolling required
+      2. Start a 2-player game: verify all 3 boards visible simultaneously below oval without scrolling  
+      3. Verify betting (Fold/Check/Raise) works in active game
+      4. Verify card assignment panel appears after river betting
+      5. Verify showdown displays correctly
+      
+      Use localhost:3000 for testing (preview URL has ngrok tunnel issue).
+      Login: select player avatar → enter 4-digit PIN using numpad-btn-{n} testIDs.
