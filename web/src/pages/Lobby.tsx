@@ -263,7 +263,7 @@ export default function Lobby() {
                           style={{
                             background: canJoin ? '#00f0ff' : '#1e293b',
                             border: 'none', borderRadius: 12,
-                            padding: '10px 18px', minWidth: 60,
+                            padding: '12px 18px', minWidth: 64,
                             fontSize: 13, fontWeight: 900,
                             color: canJoin ? '#0a0f1a' : '#475569',
                             cursor: canJoin ? 'pointer' : 'default',

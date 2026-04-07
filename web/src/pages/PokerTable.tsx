@@ -366,7 +366,7 @@ export default function PokerTable() {
         <button
           onClick={handleBack}
           style={{
-            width: 36, height: 36, borderRadius: '50%', background: '#131a2a',
+            width: 44, height: 44, borderRadius: '50%', background: '#131a2a',
             border: 'none', color: '#ffffff', fontSize: 18, cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}
