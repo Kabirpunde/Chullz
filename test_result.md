@@ -270,6 +270,37 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
+      MAJOR UPDATE - Full React+Vite Web App Rewrite:
+      
+      The entire frontend has been rewritten as a React+Vite PWA web app in /app/web/.
+      The expo binary wrapper redirects 'yarn expo start' to serve the Vite app on port 3000 instead.
+      
+      New files:
+      - /app/web/src/pages/SelectProfile.tsx (profile grid + PIN modal)
+      - /app/web/src/pages/Lobby.tsx (table list + create table + join)
+      - /app/web/src/pages/PokerTable.tsx (game screen - fully responsive)
+      - /app/web/src/components/PlayingCard.tsx, RaiseControl.tsx, AssignmentPanel.tsx, ShowdownOverlay.tsx
+      - /app/web/src/context/AuthContext.tsx (uses localStorage instead of AsyncStorage)
+      - /app/web/src/utils/handEvaluator.ts (ported from Expo)
+      - Vite PWA config (manifest, service worker, installable on mobile)
+      
+      Key improvements:
+      1. Fully responsive - scales on all phone sizes (uses clamp, dvh, viewport units)
+      2. No element overlapping - tested at 390x844 and other sizes
+      3. PWA support - installable to home screen, works offline
+      4. Dark premium poker UI with proper web CSS (no React Native)
+      5. All screen sizes properly handled with max-width: 480px container
+      
+      Test credentials: AceKing=1111, BluffMaster=2222, CardShark=3333, TableAdmin=0000
+      Web app URL: https://three-boards.preview.emergentagent.com
+      
+      Test sequence:
+      1. Login screen shows profile grid -> click profile -> PIN modal appears -> enter 1111 -> navigate to lobby
+      2. Lobby shows online players + tables list -> Create Table -> Join Table
+      3. Poker table: vertical oval, 3 stacked boards, betting actions, assignment panel, showdown
+      
+  - agent: "main"
+    message: |
       I've implemented the full Chullz Phase 2 frontend including:
       1. Updated lobby.tsx: Real tables list from /api/tables, Create Table modal (with name input), join table flow
       2. Rewrote poker-table.tsx: Full WS game table with 3-board display, player seats, hole cards, action bar

@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #060b14;
+  --surface: #0a0f1a;
+  --card: #131a2a;
+  --border: #1e293b;
+  --cyan: #00f0ff;
+  --gold: #ffb800;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Prevent text selection on game elements */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Touch feedback */
+.btn-press:active { transform: scale(0.96); }
+
+/* Smooth transitions */
+.transition-fast { transition: all 0.15s ease; }
+
+/* Pin dot animation */
+@keyframes pinFill {
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pin-dot-fill { animation: pinFill 0.15s ease forwards; }
+
+/* Glow pulse for turn indicator */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 8px #ffb80050; }
+  50% { box-shadow: 0 0 20px #ffb800aa; }
+}
+.turn-glow { animation: glowPulse 1.5s ease-in-out infinite; }
+
+/* Shake animation */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-12px); }
+  40% { transform: translateX(12px); }
+  60% { transform: translateX(-8px); }
+  80% { transform: translateX(8px); }
+}
+.shake { animation: shake 0.4s ease; }
+
+/* Timer bar fill */
+@keyframes timerShrink {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+/* Full screen layout */
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Card hover */
+.playing-card:hover {
+  transform: translateY(-4px);
+  transition: transform 0.15s ease;
+}
