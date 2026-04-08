@@ -292,7 +292,7 @@ agent_communication:
       5. All screen sizes properly handled with max-width: 480px container
       
       Test credentials: AceKing=1111, BluffMaster=2222, CardShark=3333, TableAdmin=0000
-      Web app URL: https://three-boards.preview.emergentagent.com
+      Web app URL: https://poker-chips-2.preview.emergentagent.com
       
       Test sequence:
       1. Login screen shows profile grid -> click profile -> PIN modal appears -> enter 1111 -> navigate to lobby
