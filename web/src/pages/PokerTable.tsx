@@ -558,11 +558,13 @@ export default function PokerTable() {
             })()}
           </div>
 
-          {/* My Hole Cards */}
+          {/* My Hole Cards - zIndex 20 ensures they render above the seat which can overflow ZONE_H */}
           {holeCards.length > 0 && round !== 'waiting' && (
             <div style={{
               display: 'flex', justifyContent: 'center', gap: 6,
-              marginTop: 6, flexShrink: 0,
+              marginTop: Math.round(SEAT_SIZE * 0.55),   // extra push-down so hole cards clear the seat
+              flexShrink: 0,
+              position: 'relative', zIndex: 20,
             }}>
               {holeCards.map((c, i) => (
                 <PlayingCard key={i} card={c} size="md" />
