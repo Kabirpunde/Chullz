@@ -26,6 +26,10 @@ export default function Lobby() {
   const [joining, setJoining] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [tableName, setTableName] = useState('');
+  const [blindSmall, setBlindSmall] = useState(25);
+  const [blindBig, setBlindBig] = useState(50);
+  const [startChips, setStartChips] = useState(5000);
+  const [maxPlayers, setMaxPlayers] = useState(6);
   const [creating, setCreating] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);

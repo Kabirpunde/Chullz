@@ -165,6 +165,7 @@ class GameRoom:
     timer_ends: float = 0.0
     connections: Dict[str, Any] = field(default_factory=dict)  # uid → WebSocket
     last_showdown: Optional[Dict] = None
+    showdown_ready: set = field(default_factory=set)  # uids who voted "Next Hand"
 
     # helpers
     def active(self) -> List[GPlayer]:
@@ -214,6 +215,7 @@ def _public_state(room: GameRoom) -> Dict:
         "timer_ends": room.timer_ends,
         "assigned_uids": list(room.hand.assignments.keys()) if room.hand else [],
         "last_showdown": room.last_showdown,
+        "showdown_ready": list(room.showdown_ready),
     }
 
 async def _broadcast(room: GameRoom, msg: Dict):
@@ -632,20 +634,23 @@ async def _finalize_showdown(room: GameRoom):
     result["player_statuses"] = {p.user_id: p.status for p in room.players}
     room.last_showdown = result
 
+    # 2-minute showdown timer — players can vote to skip early
+    room.showdown_ready = set()
     await _broadcast(room, {"type": "showdown_result", "data": result})
+    await _start_timer(room, 120, _next_hand_auto(room.table_id, room.hand_number, 120))
     await _broadcast_state(room)
-
-    # Auto-start next hand after 8 seconds
-    await asyncio.sleep(8)
-    if room.status == "playing":
-        # Remove busted players (0 chips, give them rebuy option later)
-        await _start_hand(room)
 
 
 async def _end_hand_last_player(room: GameRoom):
     """One player left — they win the pot."""
     if not room.hand:
         return
+
+    # Cancel any active timer and clear the timer display immediately
+    if room.timer_task and not room.timer_task.done():
+        room.timer_task.cancel()
+    room.timer_ends = 0
+
     room.hand.pot += sum(room.hand.bets.values())
     winner = next((p for p in room.players if p.status not in ("folded", "sitting_out")), None)
     if winner:
@@ -664,12 +669,12 @@ async def _end_hand_last_player(room: GameRoom):
     }
     room.last_showdown = result
     room.round = "showdown"
+    room.showdown_ready = set()
 
     await _broadcast(room, {"type": "showdown_result", "data": result})
+    # 30-second showdown timer for uncontested wins (shorter since nothing to review)
+    await _start_timer(room, 30, _next_hand_auto(room.table_id, room.hand_number, 30))
     await _broadcast_state(room)
-    await asyncio.sleep(5)
-    if room.status == "playing":
-        await _start_hand(room)
 
 
 # ── Timer coroutines ──────────────────────────────────────────────────────────
@@ -681,6 +686,16 @@ async def _auto_fold(table_id: str, seat: int, hand_num: int):
     p = room.by_seat(seat)
     if p:
         await _apply_action(room, p.user_id, "fold", 0)
+
+
+async def _next_hand_auto(table_id: str, hand_num: int, secs: float = 120):
+    """Auto-start next hand after showdown timer expires."""
+    await asyncio.sleep(secs)
+    room = game_rooms.get(table_id)
+    if not room or room.hand_number != hand_num:
+        return
+    if room.status == "playing":
+        await _start_hand(room)
 
 
 async def _auto_assign_timer(table_id: str, hand_num: int):
@@ -885,6 +900,19 @@ async def game_ws(ws: WebSocket, table_id: str, user_id: str):
                     "board_3": data.get("board_3", []),
                 }
                 await _submit_assignment(room, user_id, assignment)
+
+            elif mtype == "ready_next_hand":
+                # Player votes to skip showdown timer and start next hand early
+                if room.round == "showdown":
+                    room.showdown_ready.add(user_id)
+                    await _broadcast_state(room)
+                    # If all connected players have voted, start next hand in 5s
+                    connected_uids = set(room.connections.keys())
+                    if connected_uids and connected_uids.issubset(room.showdown_ready):
+                        if room.timer_task and not room.timer_task.done():
+                            room.timer_task.cancel()
+                        await _start_timer(room, 5, _next_hand_auto(room.table_id, room.hand_number, 5))
+                        await _broadcast_state(room)
 
             elif mtype == "ping":
                 await _send(room, user_id, {"type": "pong"})
