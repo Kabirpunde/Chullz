@@ -270,6 +270,22 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
+      SWITCH TO VITE WEB APP - Web-first responsive redesign:
+      
+      1. Created expo wrapper script at /app/frontend/node_modules/.bin/expo that starts Vite dev server
+         from /app/web instead of Expo, on the same port 3000, no supervisor config changes needed.
+      2. Added backend proxy to vite.config.ts: /api/* → http://localhost:8001 (with ws: true for WebSockets)
+      3. Rewrote SelectProfile.tsx: responsive grid (auto-fill minmax 160px), wider on desktop (4 cols)
+      4. Rewrote Lobby.tsx: fully responsive layout with isDesktop detection:
+         - Desktop (>=768px): sidebar layout with Players sidebar + main tables column
+         - Mobile (<768px): single column stacked layout
+      5. Both views confirmed working with screenshots.
+      
+      Preview URL: https://035ce19f-6e8e-48a8-8c9b-66d41aef6992.preview.emergentagent.com
+      (Or click Preview button in the Emergent interface)
+      
+  - agent: "main"
+    message: |
       MAJOR UPDATE - Full React+Vite Web App Rewrite:
       
       The entire frontend has been rewritten as a React+Vite PWA web app in /app/web/.

@@ -75,15 +75,29 @@ html, body, #root {
   to { width: 0%; }
 }
 
-/* Full screen layout */
+/* Full screen layout - mobile first, expands on desktop */
 .screen {
   display: flex;
   flex-direction: column;
   height: 100dvh;
+  width: 100%;
   max-width: 480px;
   margin: 0 auto;
   position: relative;
   overflow: hidden;
+}
+
+/* Desktop: allow screens to be wider */
+@media (min-width: 768px) {
+  .screen {
+    max-width: 480px;
+  }
+  .screen.wide {
+    max-width: 960px;
+  }
+  html, body, #root {
+    background: radial-gradient(ellipse at center, #0a1628 0%, #060b14 70%);
+  }
 }
 
 /* Card hover */

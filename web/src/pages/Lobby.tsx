@@ -113,283 +113,358 @@ export default function Lobby() {
     }
   };
 
+  const [isDesktop, setIsDesktop] = React.useState(window.innerWidth >= 768);
+  useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth >= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const allPlayers = players.filter(p => p.role === 'player');
   const enriched = allPlayers.map(p => ({ ...p, online: onlineIds.includes(p.id) || p.online }));
+  const onlinePlayers = enriched.filter(p => p.online);
 
   if (!user) return null;
 
   return (
-    <div className="screen" style={{ background: '#0a0f1a' }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '12px 16px', borderBottom: '1px solid #1e293b',
-        background: '#0a0f1a', flexShrink: 0,
+    <div style={{ minHeight: '100dvh', background: '#060b14', display: 'flex', flexDirection: 'column' }}>
+      {/* ── TOP HEADER ── */}
+      <header style={{
+        background: '#0a0f1a',
+        borderBottom: '1px solid #1e293b',
+        padding: '0 clamp(16px, 4vw, 40px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        height: 64, flexShrink: 0,
       }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: '#00f0ff', letterSpacing: 2 }}>♠ CHULLZ</div>
-          <div style={{ fontSize: 11, color: '#475569', letterSpacing: 1 }}>Multiplayer Lobby</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 26, fontWeight: 900, color: '#00f0ff', letterSpacing: 3 }}>♠ CHULLZ</span>
+          <span style={{
+            fontSize: 10, color: '#475569', letterSpacing: 2,
+            background: '#1e293b', borderRadius: 8, padding: '3px 10px',
+          }}>MULTIPLAYER LOBBY</span>
         </div>
-        <button
-          onClick={() => {}}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-          }}
-        >
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2,
-          }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#ffffff' }}>{user.username}</span>
-            <span style={{ fontSize: 11, color: '#ffb800', fontWeight: 600 }}>🪙 {user.chips.toLocaleString()}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{user.username}</div>
+            <div style={{ fontSize: 12, color: '#ffb800', fontWeight: 600 }}>🪙 {user.chips.toLocaleString()}</div>
           </div>
           <div style={{
-            width: 42, height: 42, borderRadius: '50%',
+            width: 44, height: 44, borderRadius: '50%',
             border: `2px solid ${user.avatar_color}`,
             background: user.avatar_color + '30',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <span style={{ fontSize: 20 }}>{user.avatar}</span>
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          }} onClick={logout} title="Sign Out">
+            <span style={{ fontSize: 22 }}>{user.avatar}</span>
           </div>
-        </button>
-      </div>
+        </div>
+      </header>
 
-      {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 80px' }}>
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-            <div style={{ color: '#00f0ff', fontSize: 32 }}>⟳</div>
-          </div>
-        ) : (
-          <>
-            {/* Online players */}
-            <div style={{ padding: '16px 16px 0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontSize: 15, fontWeight: 800, color: '#ffffff' }}>Online Players</span>
-                <span style={{
-                  fontSize: 11, color: '#22c55e', fontWeight: 700,
-                  background: '#22c55e20', borderRadius: 12, padding: '3px 10px',
+      {/* ── MAIN CONTENT ── */}
+      <main style={{
+        flex: 1, display: 'flex', gap: 24,
+        padding: isDesktop ? 'clamp(16px, 3vw, 32px) clamp(16px, 4vw, 40px)' : '16px',
+        maxWidth: 1200, margin: '0 auto', width: '100%',
+        boxSizing: 'border-box',
+        flexDirection: isDesktop ? 'row' : 'column',
+        alignItems: isDesktop ? 'flex-start' : 'stretch',
+        overflowY: 'auto',
+      }}>
+
+        {/* LEFT COLUMN: Players sidebar */}
+        <aside style={{
+          width: isDesktop ? 'clamp(200px, 25%, 280px)' : '100%',
+          flexShrink: 0,
+          display: 'flex', flexDirection: 'column', gap: 16,
+        }}>
+          {/* Online now */}
+          <div style={{
+            background: '#0a0f1a', borderRadius: 16,
+            border: '1px solid #1e293b', padding: 16,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: 0.5 }}>Players</span>
+              <span style={{
+                fontSize: 11, color: '#22c55e', fontWeight: 700,
+                background: '#22c55e20', borderRadius: 10, padding: '2px 9px',
+              }}>● {onlinePlayers.length} online</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {enriched.map(p => (
+                <div key={p.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  opacity: p.online ? 1 : 0.5,
                 }}>
-                  ● {enriched.filter(p => p.online).length} online
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
-                {enriched.map(p => (
-                  <div key={p.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 60, gap: 4 }}>
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
                     <div style={{
-                      width: 52, height: 52, borderRadius: '50%',
+                      width: 38, height: 38, borderRadius: '50%',
                       border: `2px solid ${p.avatar_color}`,
                       background: p.avatar_color + '25',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      position: 'relative',
                     }}>
-                      <span style={{ fontSize: 24 }}>{p.avatar}</span>
-                      <div style={{
-                        position: 'absolute', bottom: 1, right: 1,
-                        width: 11, height: 11, borderRadius: '50%',
-                        background: p.online ? '#22c55e' : '#475569',
-                        border: '2px solid #0a0f1a',
-                      }} />
+                      <span style={{ fontSize: 18 }}>{p.avatar}</span>
                     </div>
-                    <span style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', fontWeight: 600, maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.username}</span>
+                    <div style={{
+                      position: 'absolute', bottom: 0, right: 0,
+                      width: 10, height: 10, borderRadius: '50%',
+                      background: p.online ? '#22c55e' : '#475569',
+                      border: '2px solid #0a0f1a',
+                    }} />
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Tables */}
-            <div style={{ padding: '20px 16px 0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <span style={{ fontSize: 15, fontWeight: 800, color: '#ffffff' }}>Tables</span>
-                <span style={{
-                  fontSize: 11, color: '#3b82f6', fontWeight: 700,
-                  background: '#3b82f620', borderRadius: 12, padding: '3px 10px',
-                }}>
-                  {tables.length} active
-                </span>
-              </div>
-
-              {tables.length === 0 ? (
-                <div style={{
-                  background: '#131a2a', borderRadius: 16,
-                  border: '1px dashed #1e293b',
-                  padding: 36, textAlign: 'center',
-                }}>
-                  <div style={{ fontSize: 36, marginBottom: 8 }}>🃏</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#ffffff', marginBottom: 4 }}>No active tables</div>
-                  <div style={{ fontSize: 12, color: '#475569' }}>Create one to start playing</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {p.username}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#ffb800' }}>🪙 {p.chips.toLocaleString()}</div>
+                  </div>
+                  {p.online && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />}
                 </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {tables.map(t => {
-                    const isFull = t.player_count >= t.max_players;
-                    const isPlaying = t.status === 'playing';
-                    const canJoin = !isFull && !isPlaying;
-                    return (
-                      <div key={t.table_id} style={{
-                        background: '#131a2a', borderRadius: 16,
-                        border: '1px solid #1e293b',
-                        padding: 14,
-                        display: 'flex', alignItems: 'center', gap: 12,
-                      }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                            <span style={{ fontSize: 15, fontWeight: 800, color: '#ffffff', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {t.name}
-                            </span>
-                            <span style={{
-                              fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 8,
-                              background: isPlaying ? '#ef444420' : '#22c55e20',
-                              border: `1px solid ${isPlaying ? '#ef4444' : '#22c55e'}`,
-                              color: isPlaying ? '#ef4444' : '#22c55e',
-                              whiteSpace: 'nowrap',
-                            }}>
-                              {isPlaying ? 'Playing' : 'Waiting'}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>
-                            Blinds {t.blind_small}/{t.blind_big} · {t.player_count}/{t.max_players} players · 🪙 {t.starting_chips.toLocaleString()} start
-                          </div>
-                          <div style={{ display: 'flex', gap: 2 }}>
-                            {t.players.slice(0,4).map((p,i) => (
-                              <span key={i} style={{ fontSize: 14 }}>{p.avatar}</span>
-                            ))}
-                            {t.player_count > 4 && <span style={{ fontSize: 11, color: '#475569' }}>+{t.player_count - 4}</span>}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => canJoin && joinTable(t.table_id)}
-                          disabled={!canJoin || joining === t.table_id}
-                          style={{
-                            background: canJoin ? '#00f0ff' : '#1e293b',
-                            border: 'none', borderRadius: 12,
-                            padding: '12px 18px', minWidth: 64,
-                            fontSize: 13, fontWeight: 900,
-                            color: canJoin ? '#0a0f1a' : '#475569',
-                            cursor: canJoin ? 'pointer' : 'default',
-                            flexShrink: 0,
-                            transition: 'opacity 0.15s',
-                          }}
-                        >
-                          {joining === t.table_id ? '...' : isFull ? 'Full' : isPlaying ? 'In Game' : 'Join'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              ))}
             </div>
+          </div>
 
-            {/* Logout */}
-            <div style={{ padding: '20px 16px 0' }}>
+          {/* Sign out */}
+          <button
+            onClick={logout}
+            style={{
+              background: 'none', border: '1px solid #1e293b',
+              borderRadius: 12, padding: '11px',
+              fontSize: 13, color: '#475569', cursor: 'pointer', fontWeight: 700,
+              width: '100%',
+            }}
+          >Sign Out</button>
+        </aside>
+
+        {/* RIGHT COLUMN: Tables */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+          {/* Section header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: isDesktop ? 22 : 18, fontWeight: 900, color: '#fff' }}>Active Tables</h2>
+              {isDesktop && <p style={{ margin: '4px 0 0', fontSize: 13, color: '#475569' }}>Join an existing table or create a new one</p>}
+            </div>
+            <button
+              onClick={() => setShowCreate(true)}
+              style={{
+                background: '#00f0ff', border: 'none', borderRadius: 12,
+                padding: '11px 20px', fontSize: 14, fontWeight: 900,
+                color: '#0a0f1a', cursor: 'pointer', flexShrink: 0,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+            >
+              + Create Table
+            </button>
+          </div>
+
+          {/* Tables grid */}
+          {loading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+              <div style={{ color: '#00f0ff', fontSize: 32, animation: 'spin 1s linear infinite' }}>⟳</div>
+            </div>
+          ) : tables.length === 0 ? (
+            <div style={{
+              background: '#0a0f1a', borderRadius: 20,
+              border: '2px dashed #1e293b',
+              padding: '64px 32px', textAlign: 'center', flex: 1,
+            }}>
+              <div style={{ fontSize: 56, marginBottom: 16 }}>🃏</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 8 }}>No active tables</div>
+              <div style={{ fontSize: 14, color: '#475569', marginBottom: 28 }}>Be the first to create a table and invite your friends!</div>
               <button
-                onClick={logout}
+                onClick={() => setShowCreate(true)}
                 style={{
-                  width: '100%', background: 'none', border: '1px solid #1e293b',
-                  borderRadius: 14, padding: '12px', fontSize: 13, color: '#475569',
-                  cursor: 'pointer', fontWeight: 700,
+                  background: '#00f0ff', border: 'none', borderRadius: 12,
+                  padding: '14px 32px', fontSize: 15, fontWeight: 900,
+                  color: '#0a0f1a', cursor: 'pointer',
                 }}
-              >
-                Sign Out
-              </button>
+              >+ Create Table</button>
             </div>
-          </>
-        )}
-      </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: 14,
+            }}>
+              {tables.map(t => {
+                const isFull = t.player_count >= t.max_players;
+                const isPlaying = t.status === 'playing';
+                const canJoin = !isFull && !isPlaying;
+                return (
+                  <div key={t.table_id} style={{
+                    background: '#0a0f1a', borderRadius: 18,
+                    border: `1px solid ${isPlaying ? '#3b82f630' : '#1e293b'}`,
+                    padding: 20,
+                    display: 'flex', flexDirection: 'column', gap: 12,
+                    transition: 'border-color 0.2s',
+                  }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = canJoin ? '#00f0ff40' : '#1e293b')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = isPlaying ? '#3b82f630' : '#1e293b')}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', marginBottom: 4 }}>{t.name}</div>
+                        <div style={{ fontSize: 12, color: '#64748b' }}>
+                          Blinds {t.blind_small}/{t.blind_big} · 🪙 {t.starting_chips.toLocaleString()} start
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 10,
+                        background: isPlaying ? '#3b82f620' : '#22c55e20',
+                        border: `1px solid ${isPlaying ? '#3b82f6' : '#22c55e'}`,
+                        color: isPlaying ? '#3b82f6' : '#22c55e',
+                        whiteSpace: 'nowrap', flexShrink: 0,
+                      }}>
+                        {isPlaying ? '▶ Playing' : '⏳ Waiting'}
+                      </span>
+                    </div>
 
-      {/* Bottom Bar */}
+                    {/* Players in table */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: -6 }}>
+                        {t.players.slice(0, 5).map((p, i) => (
+                          <div key={i} style={{
+                            width: 28, height: 28, borderRadius: '50%',
+                            border: '2px solid #0a0f1a',
+                            background: p.avatar_color + '40',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            marginLeft: i > 0 ? -8 : 0, zIndex: 5 - i,
+                            position: 'relative',
+                          }}>
+                            <span style={{ fontSize: 14 }}>{p.avatar}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <span style={{ fontSize: 12, color: '#64748b' }}>
+                        {t.player_count}/{t.max_players} players
+                      </span>
+                      {!isFull && !isPlaying && (
+                        <span style={{ fontSize: 11, color: '#22c55e' }}>
+                          {t.max_players - t.player_count} seat{t.max_players - t.player_count !== 1 ? 's' : ''} open
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => canJoin && joinTable(t.table_id)}
+                      disabled={!canJoin || joining === t.table_id}
+                      style={{
+                        background: canJoin ? '#00f0ff' : '#131a2a',
+                        border: canJoin ? 'none' : '1px solid #334155',
+                        borderRadius: 12, padding: '12px',
+                        fontSize: 14, fontWeight: 900,
+                        color: canJoin ? '#0a0f1a' : '#475569',
+                        cursor: canJoin ? 'pointer' : 'default',
+                        transition: 'opacity 0.15s',
+                        width: '100%',
+                      }}
+                    >
+                      {joining === t.table_id ? 'Joining...' : isFull ? 'Table Full' : isPlaying ? 'Game In Progress' : 'Join Table →'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* ── CREATE TABLE MODAL ── */}
+      {showCreate && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.80)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 200, padding: 24,
+        }}
+          onClick={e => e.target === e.currentTarget && setShowCreate(false)}
+        >
+          <div style={{
+            background: '#0a0f1a', border: '1px solid #1e293b',
+            borderRadius: 24, width: '100%', maxWidth: 440,
+            padding: 32,
+            boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#fff' }}>🃏 Create Table</h3>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#475569' }}>Set up a new game table</p>
+              </div>
+              <button onClick={() => setShowCreate(false)} style={{
+                background: '#131a2a', border: 'none', width: 36, height: 36,
+                borderRadius: '50%', color: '#94a3b8', fontSize: 18, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>✕</button>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, color: '#64748b', fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 8 }}>TABLE NAME</label>
+              <input
+                type="text"
+                value={tableName}
+                onChange={e => setTableName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && createTable()}
+                placeholder="e.g. Friday Night Chullz"
+                autoFocus
+                maxLength={40}
+                style={{
+                  width: '100%', background: '#131a2a',
+                  border: '1px solid #334155',
+                  borderRadius: 12, padding: '14px 16px',
+                  color: '#fff', fontSize: 16, fontWeight: 600,
+                  outline: 'none', boxSizing: 'border-box',
+                }}
+                onFocus={e => e.target.style.borderColor = '#00f0ff'}
+                onBlur={e => e.target.style.borderColor = '#334155'}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 24 }}>
+              {[
+                { label: 'BLINDS', value: '25 / 50' },
+                { label: 'START CHIPS', value: '🪙 5,000' },
+                { label: 'MAX PLAYERS', value: '6' },
+              ].map(chip => (
+                <div key={chip.label} style={{
+                  background: '#131a2a', borderRadius: 12,
+                  border: '1px solid #1e293b', padding: '12px 8px', textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: 9, color: '#475569', fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>{chip.label}</div>
+                  <div style={{ fontSize: 13, color: '#fff', fontWeight: 800 }}>{chip.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={createTable}
+              disabled={!tableName.trim() || creating}
+              style={{
+                background: tableName.trim() && !creating ? '#00f0ff' : '#1e293b',
+                border: tableName.trim() && !creating ? 'none' : '1px solid #334155',
+                borderRadius: 14, padding: '16px',
+                fontSize: 15, fontWeight: 900, width: '100%',
+                color: tableName.trim() && !creating ? '#0a0f1a' : '#475569',
+                cursor: tableName.trim() && !creating ? 'pointer' : 'default',
+              }}
+            >
+              {creating ? 'Creating...' : '✓ Create & Join Table'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile: bottom create button */}
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        padding: '12px 16px',
-        paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-        background: '#0a0f1a', borderTop: '1px solid #1e293b',
-      }}>
+        display: 'none',
+      }} className="mobile-create-bar">
         <button
           onClick={() => setShowCreate(true)}
           style={{
             width: '100%', background: '#00f0ff', border: 'none',
             borderRadius: 14, padding: '15px', fontSize: 15,
             fontWeight: 900, color: '#0a0f1a', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}
         >
           + Create Table
         </button>
       </div>
-
-      {/* Create Table Modal */}
-      {showCreate && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          zIndex: 100,
-        }}
-          onClick={e => e.target === e.currentTarget && setShowCreate(false)}
-        >
-          <div style={{
-            background: '#0a0f1a', border: '1px solid #1e293b',
-            borderTopLeftRadius: 24, borderTopRightRadius: 24,
-            width: '100%', maxWidth: 480, paddingBottom: 32,
-          }}>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '18px 20px', borderBottom: '1px solid #1e293b',
-            }}>
-              <span style={{ fontSize: 18, fontWeight: 900, color: '#ffffff' }}>🃏 Create Table</span>
-              <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 18, cursor: 'pointer' }}>✕</button>
-            </div>
-            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <label style={{ fontSize: 11, color: '#64748b', fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 8 }}>TABLE NAME</label>
-                <input
-                  type="text"
-                  value={tableName}
-                  onChange={e => setTableName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && createTable()}
-                  placeholder="e.g. Friday Night Chullz"
-                  autoFocus
-                  maxLength={40}
-                  style={{
-                    width: '100%', background: '#131a2a', border: '1px solid #1e293b',
-                    borderRadius: 12, padding: '14px 16px',
-                    color: '#ffffff', fontSize: 16, fontWeight: 600,
-                    outline: 'none', boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[
-                  { label: 'Blinds', value: '25 / 50' },
-                  { label: 'Starting', value: '🪙 5,000' },
-                  { label: 'Max Players', value: '6' },
-                ].map(chip => (
-                  <div key={chip.label} style={{
-                    flex: 1, background: '#131a2a', borderRadius: 12,
-                    border: '1px solid #1e293b', padding: 10, textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: 9, color: '#475569', fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>{chip.label}</div>
-                    <div style={{ fontSize: 13, color: '#ffffff', fontWeight: 800 }}>{chip.value}</div>
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={createTable}
-                disabled={!tableName.trim() || creating}
-                style={{
-                  background: tableName.trim() && !creating ? '#00f0ff' : '#1e293b',
-                  border: tableName.trim() && !creating ? 'none' : '1px solid #334155',
-                  borderRadius: 14, padding: '16px',
-                  fontSize: 15, fontWeight: 900,
-                  color: tableName.trim() && !creating ? '#0a0f1a' : '#475569',
-                  cursor: tableName.trim() && !creating ? 'pointer' : 'default',
-                }}
-              >
-                {creating ? 'Creating...' : 'Create & Join Table'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
