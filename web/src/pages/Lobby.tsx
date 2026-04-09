@@ -312,17 +312,18 @@ export default function Lobby() {
               {tables.map(t => {
                 const isFull = t.player_count >= t.max_players;
                 const isPlaying = t.status === 'playing';
-                const canJoin = !isFull && !isPlaying;
+                const isInTable = t.players.some(p => p.username === user?.username);
+                const canJoin = !isFull && !isPlaying && !isInTable;
                 return (
                   <div key={t.table_id} style={{
                     background: '#0a0f1a', borderRadius: 18,
-                    border: `1px solid ${isPlaying ? '#3b82f630' : '#1e293b'}`,
+                    border: `1px solid ${isInTable ? '#00f0ff30' : isPlaying ? '#3b82f630' : '#1e293b'}`,
                     padding: 20,
                     display: 'flex', flexDirection: 'column', gap: 12,
                     transition: 'border-color 0.2s',
                   }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = canJoin ? '#00f0ff40' : '#1e293b')}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = isPlaying ? '#3b82f630' : '#1e293b')}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = isInTable ? '#00f0ff60' : canJoin ? '#00f0ff40' : '#1e293b')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = isInTable ? '#00f0ff30' : isPlaying ? '#3b82f630' : '#1e293b')}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
@@ -370,7 +371,7 @@ export default function Lobby() {
                         {t.players.slice(0, 5).map((p, i) => (
                           <div key={i} style={{
                             width: 28, height: 28, borderRadius: '50%',
-                            border: '2px solid #0a0f1a',
+                            border: `2px solid ${p.username === user?.username ? '#00f0ff' : '#0a0f1a'}`,
                             background: p.avatar_color + '40',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             marginLeft: i > 0 ? -8 : 0, zIndex: 5 - i,
@@ -383,7 +384,12 @@ export default function Lobby() {
                       <span style={{ fontSize: 12, color: '#64748b' }}>
                         {t.player_count}/{t.max_players} players
                       </span>
-                      {!isFull && !isPlaying && (
+                      {isInTable && (
+                        <span style={{ fontSize: 11, color: '#00f0ff', fontWeight: 700 }}>
+                          You're in
+                        </span>
+                      )}
+                      {!isInTable && !isFull && !isPlaying && (
                         <span style={{ fontSize: 11, color: '#22c55e' }}>
                           {t.max_players - t.player_count} seat{t.max_players - t.player_count !== 1 ? 's' : ''} open
                         </span>
@@ -391,20 +397,21 @@ export default function Lobby() {
                     </div>
 
                     <button
-                      onClick={() => canJoin && joinTable(t.table_id)}
-                      disabled={!canJoin || joining === t.table_id}
+                      onClick={() => isInTable ? navigate(`/table/${t.table_id}`) : canJoin ? joinTable(t.table_id) : null}
+                      disabled={!isInTable && !canJoin || joining === t.table_id}
+                      data-testid={`table-btn-${t.table_id}`}
                       style={{
-                        background: canJoin ? '#00f0ff' : '#131a2a',
-                        border: canJoin ? 'none' : '1px solid #334155',
+                        background: isInTable ? '#00f0ff' : canJoin ? '#00f0ff' : '#131a2a',
+                        border: isInTable || canJoin ? 'none' : '1px solid #334155',
                         borderRadius: 12, padding: '12px',
                         fontSize: 14, fontWeight: 900,
-                        color: canJoin ? '#0a0f1a' : '#475569',
-                        cursor: canJoin ? 'pointer' : 'default',
+                        color: isInTable || canJoin ? '#0a0f1a' : '#475569',
+                        cursor: isInTable || canJoin ? 'pointer' : 'default',
                         transition: 'opacity 0.15s',
                         width: '100%',
                       }}
                     >
-                      {joining === t.table_id ? 'Joining...' : isFull ? 'Table Full' : isPlaying ? 'Game In Progress' : 'Join Table →'}
+                      {joining === t.table_id ? 'Joining...' : isInTable ? '↩ Return to Table' : isFull ? 'Table Full' : isPlaying ? 'Game In Progress' : 'Join Table →'}
                     </button>
                   </div>
                 );
