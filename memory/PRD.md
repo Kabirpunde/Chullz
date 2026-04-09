@@ -10,8 +10,9 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 **User Personas:** Casual friend groups playing custom poker online via mobile browser.
 
 ## Architecture
-- **Frontend:** React + Vite PWA (`/app/web/`) served via Vite dev server on port 3000
-  - Expo binary replaced with wrapper script pointing to Vite
+- **Frontend:** React + Vite PWA (`/app/web/`) served via **Vite preview** on port 3000
+  - Supervisor runs `yarn start` → `expo start` → wrapper script at `/app/frontend/node_modules/.bin/expo`
+  - Wrapper: builds `/app/web` if no `dist/`, then starts `vite preview` (zero HMR, zero file watching)
   - PWA manifest + service worker (installable on iOS/Android home screen)
   - Max-width 480px centered, responsive with `dvh`/`vw` units
 - **Backend:** FastAPI + WebSockets (`/app/backend/server.py` + `game_engine.py`) on port 8001
@@ -25,6 +26,13 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 4. Pot Limit betting with preset buttons + slider
 5. Scoring: 1 point per board won, most points wins pot
 6. Mobile-first web app (no app store needed)
+
+## Vite Preview Fix (2026-04-09)
+- **Problem:** Vite dev server was watching source files → file changes caused restart → game state lost
+- **Previous workaround (commit 1573d39):** Added `hmr: false` + `watch: { ignored: ['**/**'] }` to `vite.config.ts`
+- **Full fix:** Replaced expo binary at `/app/frontend/node_modules/.bin/expo` with wrapper script
+  (`/app/frontend/start-vite.sh`) that runs `vite build` + `vite preview` instead of the dev server
+- **Result:** Serves pre-built static `dist/` bundle — zero file watching, zero HMR, page never reloads
 
 ## User Credentials (Test Accounts)
 | Username | PIN | Role |
