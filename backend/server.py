@@ -840,6 +840,26 @@ async def leave_table(table_id: str, cu: dict = Depends(get_current_user)):
     return {"success": True}
 
 
+@api.delete("/tables/{table_id}")
+async def delete_table(table_id: str, cu: dict = Depends(get_current_user)):
+    """Admin-only endpoint to delete a table"""
+    if cu.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    room = game_rooms.get(table_id)
+    if not room:
+        raise HTTPException(404, "Table not found")
+    # Close all websocket connections for this table
+    for uid, ws in list(room.connections.items()):
+        try:
+            await ws.close(code=4001, reason="Table deleted by admin")
+        except:
+            pass
+    room.connections.clear()
+    # Remove the table
+    del game_rooms[table_id]
+    return {"success": True, "message": f"Table {table_id} deleted"}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # GAME WEBSOCKET
 # ══════════════════════════════════════════════════════════════════════════════

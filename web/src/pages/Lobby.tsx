@@ -31,8 +31,11 @@ export default function Lobby() {
   const [startChips, setStartChips] = useState(5000);
   const [maxPlayers, setMaxPlayers] = useState(6);
   const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const isAdmin = user?.role === 'admin';
 
   const fetchAll = useCallback(async () => {
     try {
@@ -114,6 +117,24 @@ export default function Lobby() {
       console.error('Join error:', e);
     } finally {
       setJoining(null);
+    }
+  };
+
+  const deleteTable = async (tableId: string, tableName: string) => {
+    if (!token || !isAdmin || deleting) return;
+    if (!window.confirm(`Delete table "${tableName}"? This will kick all players.`)) return;
+    setDeleting(tableId);
+    try {
+      const res = await fetch(`/api/tables/${tableId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      fetchAll(); // Refresh tables list
+    } catch (e) {
+      console.error('Delete error:', e);
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -310,15 +331,37 @@ export default function Lobby() {
                           Blinds {t.blind_small}/{t.blind_big} · 🪙 {t.starting_chips.toLocaleString()} start
                         </div>
                       </div>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 10,
-                        background: isPlaying ? '#3b82f620' : '#22c55e20',
-                        border: `1px solid ${isPlaying ? '#3b82f6' : '#22c55e'}`,
-                        color: isPlaying ? '#3b82f6' : '#22c55e',
-                        whiteSpace: 'nowrap', flexShrink: 0,
-                      }}>
-                        {isPlaying ? '▶ Playing' : '⏳ Waiting'}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 10,
+                          background: isPlaying ? '#3b82f620' : '#22c55e20',
+                          border: `1px solid ${isPlaying ? '#3b82f6' : '#22c55e'}`,
+                          color: isPlaying ? '#3b82f6' : '#22c55e',
+                          whiteSpace: 'nowrap', flexShrink: 0,
+                        }}>
+                          {isPlaying ? '▶ Playing' : '⏳ Waiting'}
+                        </span>
+                        {isAdmin && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); deleteTable(t.table_id, t.name); }}
+                            disabled={deleting === t.table_id}
+                            data-testid={`delete-table-${t.table_id}`}
+                            title="Delete table"
+                            style={{
+                              background: '#ef444420',
+                              border: '1px solid #ef4444',
+                              borderRadius: 8,
+                              padding: '4px 8px',
+                              fontSize: 12,
+                              color: '#ef4444',
+                              cursor: deleting === t.table_id ? 'wait' : 'pointer',
+                              opacity: deleting === t.table_id ? 0.5 : 1,
+                            }}
+                          >
+                            {deleting === t.table_id ? '...' : '🗑'}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Players in table */}
