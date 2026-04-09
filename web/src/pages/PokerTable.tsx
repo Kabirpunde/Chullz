@@ -25,12 +25,12 @@ interface GameState {
 // ── Sizing constants ──────────────────────────────────────────────────────────
 const vh = Math.max(600, window.innerHeight);
 const vw = Math.max(320, window.innerWidth);
-const TABLE_W = Math.min(Math.round(vw * 0.76), 330);
-const SEAT_SIZE = Math.round(TABLE_W / 4.8);
-const PAD = Math.round(SEAT_SIZE / 2) + 8;          // symmetric padding around oval
-const RESERVED = 64 + 5 + 84 + 16;                  // topbar + timer + actionbar + extra
-const gameH = Math.max(180, vh - RESERVED);
-const TABLE_H = Math.round(Math.min(gameH * 0.60, TABLE_W * 1.8));
+const TABLE_W = Math.min(Math.round(vw * 0.82), 400);  // Increased for bigger cards
+const SEAT_SIZE = Math.round(TABLE_W / 5.2);
+const PAD = Math.round(SEAT_SIZE / 2) + 12;          // symmetric padding around oval
+const RESERVED = 64 + 84 + 16;                       // topbar + actionbar + extra (no timer bar)
+const gameH = Math.max(200, vh - RESERVED);
+const TABLE_H = Math.round(Math.min(gameH * 0.65, TABLE_W * 1.6));
 const ZONE_W = TABLE_W + PAD * 2;                    // ZONE has PAD on each side
 const ZONE_H = TABLE_H + PAD * 2;
 
@@ -59,15 +59,48 @@ function chipPos(angleDeg: number) {
 }
 
 // ── Small sub-components ──────────────────────────────────────────────────────
-function PlayerSeat({ player, isMine, isActive }: {
-  player: PublicPlayer; isMine: boolean; isActive: boolean;
+function PlayerSeat({ player, isMine, isActive, timerProgress }: {
+  player: PublicPlayer; isMine: boolean; isActive: boolean; timerProgress?: number;
 }) {
   const online = true; // seats are always shown as online during game
+  const showTimer = isActive && timerProgress !== undefined && timerProgress > 0;
+  const circumference = Math.PI * (SEAT_SIZE + 6); // circle circumference
+  const strokeDashoffset = circumference * (1 - timerProgress);
+  const timerColor = timerProgress <= 0.33 ? '#ef4444' : timerProgress <= 0.67 ? '#f59e0b' : '#00f0ff';
+  
   return (
     <div style={{
-      width: SEAT_SIZE, display: 'flex', flexDirection: 'column',
+      width: SEAT_SIZE + 8, display: 'flex', flexDirection: 'column',
       alignItems: 'center', gap: 3,
+      position: 'relative',
     }}>
+      {/* Timer circle SVG */}
+      {showTimer && (
+        <svg
+          width={SEAT_SIZE + 12}
+          height={SEAT_SIZE + 12}
+          style={{
+            position: 'absolute',
+            top: -4,
+            left: -2,
+            transform: 'rotate(-90deg)',
+            pointerEvents: 'none',
+          }}
+        >
+          <circle
+            cx={(SEAT_SIZE + 12) / 2}
+            cy={(SEAT_SIZE + 12) / 2}
+            r={(SEAT_SIZE + 6) / 2}
+            fill="none"
+            stroke={timerColor}
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            style={{ transition: 'stroke-dashoffset 0.5s linear, stroke 0.3s' }}
+          />
+        </svg>
+      )}
       {/* Avatar circle */}
       <div style={{
         width: SEAT_SIZE, height: SEAT_SIZE, borderRadius: '50%',
@@ -190,7 +223,7 @@ export default function PokerTable() {
   // Showdown vote
   const [readyVoted, setReadyVoted] = useState(false);
 
-  const { playCheck, playChips, playTick, playSubmit, playFold } = useSoundEffects();
+  const { playCheck, playChips, playTick, playSubmit, playFold, muted, toggleMute } = useSoundEffects();
   const prevRoundRef = useRef('');
   const prevTimeRef = useRef(0);
 
@@ -228,8 +261,12 @@ export default function PokerTable() {
             break;
           }
           case 'hole_cards':
-            setHoleCards(msg.data.hole_cards);
-            setHoleCardOrder(msg.data.hole_cards.map((_: string, i: number) => i));
+            const newCards = msg.data.hole_cards;
+            // Only reset order if cards actually changed
+            if (JSON.stringify(newCards) !== JSON.stringify(holeCards)) {
+              setHoleCards(newCards);
+              setHoleCardOrder(newCards.map((_: string, i: number) => i));
+            }
             break;
           case 'your_turn':
             // Backend sends valid_actions as an object with action keys
@@ -358,6 +395,10 @@ export default function PokerTable() {
     : holeCards;
   const BOARD_COLORS = ['#3b82f6', '#22c55e', '#f59e0b'];
   const BOARD_LABELS = ['B1', 'B1', 'B2', 'B2', 'B3', 'B3'];
+  
+  // Timer progress (0-1) for circular timer around active player
+  const timerDuration = round === 'showdown' ? 120 : round === 'assignment' ? 60 : 30;
+  const timerProgress = timeLeft > 0 ? timeLeft / timerDuration : 0;
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (!user) return null;
@@ -409,23 +450,30 @@ export default function PokerTable() {
           <div style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>{gameState ? '#' + gameState.hand_number : '—'}</div>
           <div style={{ fontSize: 10, color: '#00f0ff', letterSpacing: 1 }}>{round.toUpperCase()}</div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 12, color: '#ffb800', fontWeight: 700 }}>POT</div>
-          <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>{(gameState?.pot ?? 0).toLocaleString()}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 12, color: '#ffb800', fontWeight: 700 }}>POT</div>
+            <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>{(gameState?.pot ?? 0).toLocaleString()}</div>
+          </div>
+          {/* Mute button */}
+          <button
+            onClick={toggleMute}
+            data-testid="mute-toggle"
+            style={{
+              background: muted ? '#ef444430' : '#131a2a',
+              border: `1px solid ${muted ? '#ef4444' : '#334155'}`,
+              borderRadius: 8,
+              padding: '6px 10px',
+              fontSize: 16,
+              cursor: 'pointer',
+              color: muted ? '#ef4444' : '#64748b',
+            }}
+            title={muted ? 'Unmute sounds' : 'Mute sounds'}
+          >
+            {muted ? '🔇' : '🔊'}
+          </button>
         </div>
       </div>
-
-      {/* ── TIMER BAR ── */}
-      {timeLeft > 0 && round !== 'waiting' && (
-        <div style={{ height: 5, background: '#1e293b', flexShrink: 0 }}>
-          <div style={{
-            height: '100%',
-            width: `${Math.min(100, (timeLeft / (round === 'showdown' ? 120 : 30)) * 100)}%`,
-            background: timeLeft <= 10 ? '#ef4444' : timeLeft <= 20 ? '#f59e0b' : '#00f0ff',
-            transition: 'width 0.5s linear, background 0.5s',
-          }} />
-        </div>
-      )}
 
       {/* ── GAME VIEW ── */}
       <div style={{
@@ -450,20 +498,20 @@ export default function PokerTable() {
             <div style={{
               position: 'absolute', inset: 0,
               display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 4,
+              alignItems: 'center', justifyContent: 'center', gap: 6,
               padding: '10px 8px',
             }}>
               {(gameState?.boards ?? []).map((b, i) => {
                 const community = [...b.flop, b.turn, b.river].filter(Boolean);
                 return (
                   <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: 3,
-                    background: 'rgba(0,0,0,0.25)', borderRadius: 8,
-                    padding: '3px 5px', width: '100%', justifyContent: 'center',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    background: 'rgba(0,0,0,0.25)', borderRadius: 10,
+                    padding: '4px 8px', justifyContent: 'center',
                   }}>
-                    <span style={{ fontSize: 8, fontWeight: 900, color: BOARD_COLORS[i], marginRight: 2, minWidth: 12 }}>B{i+1}</span>
+                    <span style={{ fontSize: 10, fontWeight: 900, color: BOARD_COLORS[i], marginRight: 4, minWidth: 16 }}>B{i+1}</span>
                     {[0,1,2,3,4].map(ci => (
-                      <PlayingCard key={ci} card={community[ci] ?? undefined} faceDown={!community[ci]} size="xs" />
+                      <PlayingCard key={ci} card={community[ci] ?? undefined} faceDown={!community[ci]} size="board" />
                     ))}
                   </div>
                 );
@@ -562,11 +610,11 @@ export default function PokerTable() {
             return (
               <div key={i} style={{
                 position: 'absolute',
-                left: pos.x - SEAT_SIZE / 2,
+                left: pos.x - SEAT_SIZE / 2 - 4,
                 top: pos.y - SEAT_SIZE / 2 - 4,
                 zIndex: 10,
               }}>
-                <PlayerSeat player={opp} isMine={false} isActive={isActive} />
+                <PlayerSeat player={opp} isMine={false} isActive={isActive} timerProgress={isActive ? timerProgress : undefined} />
               </div>
             );
           })}
@@ -577,11 +625,11 @@ export default function PokerTable() {
             return (
               <div style={{
                 position: 'absolute',
-                left: pos.x - SEAT_SIZE / 2,
+                left: pos.x - SEAT_SIZE / 2 - 4,
                 top: pos.y - SEAT_SIZE / 2 - 4, // half inside oval
                 zIndex: 10,
               }}>
-                <PlayerSeat player={myPlayer} isMine={true} isActive={!!isMyTurn} />
+                <PlayerSeat player={myPlayer} isMine={true} isActive={!!isMyTurn} timerProgress={isMyTurn ? timerProgress : undefined} />
               </div>
             );
           })()}

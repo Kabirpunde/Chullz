@@ -1,9 +1,30 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
+
+// Global mute state stored in localStorage
+const MUTE_KEY = 'chullz_muted';
 
 export function useSoundEffects() {
   const ctxRef = useRef<AudioContext | null>(null);
+  const [muted, setMuted] = useState(() => {
+    try {
+      return localStorage.getItem(MUTE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleMute = useCallback(() => {
+    setMuted(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem(MUTE_KEY, String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
 
   const getCtx = (): AudioContext | null => {
+    if (muted) return null;
     try {
       if (!ctxRef.current || ctxRef.current.state === 'closed') {
         ctxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -125,5 +146,5 @@ export function useSoundEffects() {
     } catch {}
   }, []);
 
-  return { playCheck, playChips, playTick, playSubmit, playFold };
+  return { playCheck, playChips, playTick, playSubmit, playFold, muted, toggleMute };
 }

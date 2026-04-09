@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',  // Changed from autoUpdate to prevent auto-refresh
       includeAssets: ['favicon.ico', 'icons/*.png'],
       manifest: {
         name: 'Chullz Poker',
@@ -24,6 +24,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // Disable runtime caching to prevent stale cache issues
+        runtimeCaching: [],
+      },
+      devOptions: {
+        enabled: false,  // Disable PWA in dev mode
       },
     }),
   ],

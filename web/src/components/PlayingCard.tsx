@@ -3,7 +3,7 @@ import { cardRank, cardSuit } from '../utils/handEvaluator';
 
 interface CardProps {
   card?: string;
-  size?: 'xs' | 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'board';
   selected?: boolean;
   assigned?: boolean;
   faceDown?: boolean;
@@ -15,6 +15,7 @@ const SIZES = {
   sm: { w: 38, h: 54, rank: 14, suit: 14, radius: 5 },
   md: { w: 52, h: 72, rank: 18, suit: 20, radius: 7 },
   lg: { w: 66, h: 92, rank: 24, suit: 26, radius: 9 },
+  board: { w: 44, h: 62, rank: 16, suit: 18, radius: 6 },
 };
 
 const SUIT_COLORS: Record<string, string> = {
