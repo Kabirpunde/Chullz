@@ -52,9 +52,16 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 - ✅ Real-time WebSocket game updates
 - ✅ 3-board poker variant (Chullz rules)
 - ✅ Card assignment phase with drag-to-reorder
-- ✅ Pot-limit betting with preset buttons
-- ✅ Showdown and scoring system
+- ✅ Pot-limit betting with preset buttons (Fold/Call/Raise)
+- ✅ Raise slider with amount selection
+- ✅ Turn timer countdown (30s for actions, 60s for assignments)
+- ✅ Showdown and scoring system with winner overlay
 - ✅ Mobile-first PWA design
+
+## Fixed Issues (2026-04-09)
+- Fixed WebSocket message type mismatch ('your_turn' vs 'valid_actions')
+- Action buttons (Fold/Call/Raise) now display correctly when it's player's turn
+- Switched frontend from React Native Expo to Vite web app
 
 ## Tech Stack
 - **Frontend**: React + Vite + TypeScript (PWA)
