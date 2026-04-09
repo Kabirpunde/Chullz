@@ -90,6 +90,7 @@ export default function SelectProfile() {
         {PROFILES.map(p => (
           <button
             key={p.username}
+            data-testid={`profile-${p.username.toLowerCase()}`}
             onClick={() => handleSelectProfile(p)}
             style={{
               background: '#0a0f1a',
@@ -201,13 +202,17 @@ export default function SelectProfile() {
             {loading ? (
               <div style={{ padding: '32px 0', color: '#00f0ff', fontSize: 32, textAlign: 'center' }}>⟳</div>
             ) : (
-              <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(3, 76px)',
-                gap: 8, marginBottom: 18,
-              }}>
+              <div
+                data-testid="pin-keypad"
+                style={{
+                  display: 'grid', gridTemplateColumns: 'repeat(3, 76px)',
+                  gap: 8, marginBottom: 18,
+                }}
+              >
                 {['1','2','3','4','5','6','7','8','9','⌫','0','✓'].map((n) => (
                   <button
                     key={n}
+                    data-testid={`pin-btn-${n === '⌫' ? 'delete' : n === '✓' ? 'confirm' : n}`}
                     onClick={() => {
                       if (n === '⌫') handleDelete();
                       else if (n === '✓') handleLogin();
