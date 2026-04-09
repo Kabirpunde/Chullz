@@ -62,6 +62,11 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 - Fixed WebSocket message type mismatch ('your_turn' vs 'valid_actions')
 - Action buttons (Fold/Call/Raise) now display correctly when it's player's turn
 - Switched frontend from React Native Expo to Vite web app
+- Timer now shows as receding circle around active player's avatar
+- Added mute/unmute button at top right for sound control
+- Increased community board card sizes for better visibility
+- Disabled PWA auto-update to prevent mid-game page refreshes
+- Hole card ordering preserved - only resets when new cards are dealt
 
 ## Tech Stack
 - **Frontend**: React + Vite + TypeScript (PWA)
