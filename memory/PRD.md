@@ -44,3 +44,25 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 | AllInAndy | 5555 | player |
 | HighRoller | 6666 | player |
 | TableAdmin | 0000 | admin |
+
+## What's Been Implemented (2026-04-09)
+- ✅ Profile selection with PIN authentication
+- ✅ Multiplayer lobby with online player tracking
+- ✅ Table creation and joining
+- ✅ Real-time WebSocket game updates
+- ✅ 3-board poker variant (Chullz rules)
+- ✅ Card assignment phase with drag-to-reorder
+- ✅ Pot-limit betting with preset buttons
+- ✅ Showdown and scoring system
+- ✅ Mobile-first PWA design
+
+## Tech Stack
+- **Frontend**: React + Vite + TypeScript (PWA)
+- **Backend**: FastAPI + WebSockets
+- **Database**: MongoDB
+- **Auth**: JWT with PIN-based login
+
+## Next Action Items
+- Add sound effects toggle option
+- Implement spectator mode
+- Add game history/stats tracking
