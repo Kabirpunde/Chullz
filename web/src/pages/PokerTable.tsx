@@ -231,8 +231,16 @@ export default function PokerTable() {
             setHoleCards(msg.data.hole_cards);
             setHoleCardOrder(msg.data.hole_cards.map((_: string, i: number) => i));
             break;
-          case 'valid_actions':
-            setValidActions(msg.data.actions);
+          case 'your_turn':
+            // Backend sends valid_actions as an object with action keys
+            const acts = msg.data.valid_actions;
+            const actionsList = [];
+            if (acts.fold) actionsList.push({ action: 'fold', min_amount: 0, max_amount: 0 });
+            if (acts.check) actionsList.push({ action: 'check', min_amount: 0, max_amount: 0 });
+            if (acts.call !== undefined) actionsList.push({ action: 'call', min_amount: acts.call, max_amount: acts.call });
+            if (acts.raise) actionsList.push({ action: 'raise', min_amount: acts.raise.min, max_amount: acts.raise.max });
+            if (acts.all_in !== undefined) actionsList.push({ action: 'all_in', min_amount: acts.all_in, max_amount: acts.all_in });
+            setValidActions(actionsList);
             setShowRaise(false);
             break;
           case 'showdown_result':
