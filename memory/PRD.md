@@ -77,11 +77,16 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 ## Remaining / Upcoming Tasks
 
 ### Phase 4 (Rules & UX — 2026-05-xx)
-- **Inline Assignment** — Removed separate full-screen AssignmentPanel; confirm button now appears inline on the main table below hole cards; drag-to-swap works in-place
-- **Omaha Rules** — `best_hand_omaha()` requires exactly both hole cards + 3 community cards; single-card flushes/straights impossible
-- **Player-relative descriptions** — `_desc5_omaha()` uses player's highest hole card for flush/high-card "high" descriptors; all other hand types unchanged
-- Game history/stats tracking dashboard
-- AI bot player for solo practice  
+- **Inline Assignment** — confirm button inline on main table; drag-to-swap works in-place
+- **Omaha Rules** — `best_hand_omaha()` exactly 2 hole + 3 community; single-card flushes impossible
+- **Player-relative descriptions** — hole card high for flush/high-card
+- **Game History & Stats** — `/history` page, leaderboard, per-hand P&L, `/api/history` + `/api/stats`
+- **MongoDB Persistence** — tables persist across backend restarts; hand history logged per completed hand
+
+### Phase 5 (Live Preview — 2026-05-xx)
+- **Live Hand Strength Badges** — `bestHandOmaha()` in `handEvaluator.ts`; 3 reactive badges under hole cards during flop/turn/river/assignment; Omaha shorthand; hole-card-relative high labels
+
+### P3 Future / Backlog
+- AI bot player for solo practice
 - Quick Match auto-matchmaking
-- Move game state from in-memory → MongoDB (production resilience)
-- "Kick Player" from lobby (not just from inside table)
+- Kick Player from lobby (not just inside a table)
