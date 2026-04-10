@@ -33,6 +33,87 @@ log = logging.getLogger(__name__)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# MONGODB PERSISTENCE HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+async def _save_table(room: 'GameRoom'):
+    """Upsert table config and current player chip counts to MongoDB."""
+    doc = {
+        "name": room.name,
+        "host_id": room.host_id,
+        "blind_small": room.blind_small,
+        "blind_big": room.blind_big,
+        "starting_chips": room.starting_chips,
+        "max_players": room.max_players,
+        "hand_number": room.hand_number,
+        "players": [
+            {"user_id": p.user_id, "username": p.username, "avatar": p.avatar,
+             "avatar_color": p.avatar_color, "seat": p.seat, "chips": p.chips}
+            for p in room.players
+        ],
+        "updated_at": datetime.now(timezone.utc),
+    }
+    await db.game_tables.update_one({"_id": room.table_id}, {"$set": doc}, upsert=True)
+
+
+async def _save_hand_history(room: 'GameRoom', result: Dict):
+    """Persist a completed hand to MongoDB for history and stats."""
+    contributions = room.hand.contributions if room.hand else {}
+    chips_won = result.get("chips_won", {})
+    boards_data = []
+    if room.hand:
+        for b in room.hand.boards:
+            boards_data.append({"board_id": b.board_id,
+                                 "flop": b.flop, "turn": b.turn, "river": b.river})
+    players_data = []
+    for p in room.players:
+        won = chips_won.get(p.user_id, 0)
+        cont = contributions.get(p.user_id, 0)
+        players_data.append({
+            "user_id": p.user_id, "username": p.username,
+            "avatar": p.avatar, "avatar_color": p.avatar_color,
+            "chips_won": won, "contributed": cont, "net": won - cont,
+        })
+    doc = {
+        "table_id": room.table_id, "table_name": room.name,
+        "hand_number": room.hand_number,
+        "pot": result.get("pot", 0),
+        "uncontested": result.get("uncontested", False),
+        "winner_username": result.get("winner_username", ""),
+        "board_winners": result.get("board_winners", {}),
+        "points": result.get("points", {}),
+        "chips_won": chips_won,
+        "boards": boards_data,
+        "players": players_data,
+        "played_at": datetime.now(timezone.utc),
+    }
+    await db.hand_history.insert_one(doc)
+    # Also snapshot current chip counts after distribution
+    await _save_table(room)
+
+
+async def _restore_tables():
+    """On startup: reload tables from MongoDB so they survive backend restarts."""
+    count = 0
+    async for doc in db.game_tables.find({}):
+        table_id = doc["_id"]
+        room = GameRoom(
+            table_id=table_id, name=doc["name"], host_id=doc["host_id"],
+            blind_small=doc["blind_small"], blind_big=doc["blind_big"],
+            starting_chips=doc["starting_chips"], max_players=doc["max_players"],
+            status="waiting", hand_number=doc.get("hand_number", 0),
+        )
+        for p in doc.get("players", []):
+            room.players.append(GPlayer(
+                user_id=p["user_id"], username=p["username"],
+                avatar=p["avatar"], avatar_color=p["avatar_color"],
+                seat=p["seat"], chips=p["chips"], status="waiting",
+            ))
+        game_rooms[table_id] = room
+        count += 1
+    log.info(f"Restored {count} tables from MongoDB")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # AUTH HELPERS (from Phase 1 — unchanged)
 # ══════════════════════════════════════════════════════════════════════════════
 def hash_pin(pin: str) -> str:
@@ -637,6 +718,9 @@ async def _finalize_showdown(room: GameRoom):
     result["player_statuses"] = {p.user_id: p.status for p in room.players}
     room.last_showdown = result
 
+    # Persist hand to MongoDB
+    await _save_hand_history(room, result)
+
     # 2-minute showdown timer — players can vote to skip early
     room.showdown_ready = set()
     await _broadcast(room, {"type": "showdown_result", "data": result})
@@ -673,6 +757,9 @@ async def _end_hand_last_player(room: GameRoom):
     room.last_showdown = result
     room.round = "showdown"
     room.showdown_ready = set()
+
+    # Persist hand to MongoDB
+    await _save_hand_history(room, result)
 
     await _broadcast(room, {"type": "showdown_result", "data": result})
     # 30-second showdown timer for uncontested wins (shorter since nothing to review)
@@ -831,6 +918,7 @@ async def create_table(req: CreateTableReq, cu: dict = Depends(get_current_user)
         starting_chips=req.starting_chips, max_players=req.max_players,
     )
     game_rooms[table_id] = room
+    await _save_table(room)
     return {"table_id": table_id, "name": req.name}
 
 
@@ -864,6 +952,7 @@ async def join_table(req: JoinTableReq, cu: dict = Depends(get_current_user)):
     ))
     # Broadcast updated player list to all connected clients (including spectators)
     await _broadcast_state(room)
+    await _save_table(room)
     return {"table_id": req.table_id, "seat": seat}
 
 
@@ -883,6 +972,9 @@ async def leave_table(table_id: str, cu: dict = Depends(get_current_user)):
     room.players = [p for p in room.players if p.user_id != cu["id"]]
     if not room.players:
         del game_rooms[table_id]
+        await db.game_tables.delete_one({"_id": table_id})
+    else:
+        await _save_table(room)
     return {"success": True}
 
 
@@ -901,8 +993,9 @@ async def delete_table(table_id: str, cu: dict = Depends(get_current_user)):
         except:
             pass
     room.connections.clear()
-    # Remove the table
+    # Remove the table from memory and MongoDB
     del game_rooms[table_id]
+    await db.game_tables.delete_one({"_id": table_id})
     return {"success": True, "message": f"Table {table_id} deleted"}
 
 
@@ -925,7 +1018,64 @@ async def kick_player(table_id: str, kicked_uid: str, cu: dict = Depends(get_cur
     # Remove from players list if they were a player
     room.players = [p for p in room.players if p.user_id != kicked_uid]
     await _broadcast_state(room)
+    await _save_table(room)
     return {"success": True, "message": f"Player {kicked_uid} kicked"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HISTORY & STATS
+# ══════════════════════════════════════════════════════════════════════════════
+@api.get("/history")
+async def get_history(limit: int = 50, table_id: Optional[str] = None):
+    """Recent completed hands, newest first."""
+    query = {"table_id": table_id} if table_id else {}
+    hands = await db.hand_history.find(
+        query, {"_id": 0, "player_results": 0}
+    ).sort("played_at", -1).limit(limit).to_list(limit)
+    # Convert datetime to ISO string for JSON serialisation
+    for h in hands:
+        if "played_at" in h:
+            h["played_at"] = h["played_at"].isoformat()
+    return hands
+
+
+@api.get("/stats")
+async def get_player_stats():
+    """Aggregate per-player stats from all hand history."""
+    hands = await db.hand_history.find(
+        {}, {"_id": 0, "player_results": 0}
+    ).to_list(10000)
+
+    stats: Dict[str, Any] = {}
+    for hand in hands:
+        for p in hand.get("players", []):
+            uid = p["user_id"]
+            if uid not in stats:
+                stats[uid] = {
+                    "user_id": uid,
+                    "username": p["username"],
+                    "avatar": p["avatar"],
+                    "avatar_color": p.get("avatar_color", "#ffffff"),
+                    "hands_played": 0,
+                    "boards_won": 0,
+                    "chips_net": 0,
+                    "pots_won": 0,
+                }
+            s = stats[uid]
+            s["hands_played"] += 1
+            s["chips_net"] += p.get("net", 0)
+            # Count boards won
+            for winners in hand.get("board_winners", {}).values():
+                if uid in winners:
+                    s["boards_won"] += 1
+            # Pot won = had the most points in this hand
+            points = hand.get("points", {})
+            if points:
+                max_pts = max(points.values())
+                if points.get(uid, 0) >= max_pts and max_pts > 0:
+                    s["pots_won"] += 1
+
+    return sorted(stats.values(), key=lambda x: x["chips_net"], reverse=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1056,6 +1206,9 @@ async def startup():
             await db.users.insert_one({**p, "pin_hash": hash_pin(p["pin"]),
                                        "created_at": datetime.now(timezone.utc)})
     await db.users.create_index("username", unique=True)
+    await db.hand_history.create_index("played_at")
+    await db.hand_history.create_index("table_id")
+    await _restore_tables()
     Path("/app/memory/test_credentials.md").write_text(
         "# Chullz Test Credentials\n\n"
         "| Username | PIN | Role |\n|---|---|---|\n"

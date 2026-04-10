@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import SelectProfile from './pages/SelectProfile';
 import Lobby from './pages/Lobby';
 import PokerTable from './pages/PokerTable';
+import History from './pages/History';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -25,6 +26,7 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/lobby" replace /> : <SelectProfile />} />
       <Route path="/lobby" element={<ProtectedRoute><Lobby /></ProtectedRoute>} />
       <Route path="/table/:tableId" element={<ProtectedRoute><PokerTable /></ProtectedRoute>} />
+      <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to={user ? '/lobby' : '/login'} replace />} />
     </Routes>
   );

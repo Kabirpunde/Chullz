@@ -1,0 +1,91 @@
+{
+  "summary": "Iteration 13: Tested MongoDB persistence and Stats & History dashboard features. All 21 backend tests PASS. All frontend tests PASS. MongoDB persistence for tables (create/join/leave/delete) verified directly via motor async client. Stats (/api/stats) and History (/api/history) endpoints verified with mock hand data injected into MongoDB. History page UI tested with Playwright: Stats button, /history route, both tabs (Leaderboard & Recent Hands), empty states, leaderboard rows, hand rows, and expand functionality all verified.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "location": "server.py _apply_action() lines 560-561",
+        "issue": "Dead/redundant code: `room.hand.contributions[uid] = room.hand.contributions.get(uid, 0)` is immediately overwritten by the next line `room.hand.contributions[uid] = p.bet_total`. First line is unnecessary but harmless."
+      },
+      {
+        "location": "server.py startup()",
+        "issue": "game_tables collection has no index created on startup. Only hand_history has indexes. For production scale this could cause slow lookups, but acceptable for current app scale."
+      }
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Lobby WebSocket",
+        "issue": "Console error 'WebSocket is closed before the connection is established' appears in browser console. This is benign - happens during test session lifecycle when browser navigates away before WS fully connects. Not visible to users.",
+        "affected_selectors": []
+      }
+    ],
+    "design_issues": []
+  },
+
+  "features_tested": {
+    "GET /api/stats empty": "PASS - returns [] when no hands played",
+    "GET /api/history empty": "PASS - returns [] when no hands played",
+    "POST /api/tables/create saves to MongoDB": "PASS - verified via direct MongoDB query",
+    "POST /api/tables/join updates MongoDB players": "PASS - verified player_ids in game_tables doc",
+    "DELETE /api/tables/{id}/leave removes player from MongoDB": "PASS - verified player removed, table still exists",
+    "DELETE /api/tables/{id} removes from MongoDB": "PASS - doc is None after delete",
+    "Stats button in lobby": "PASS - data-testid='stats-btn' visible in lobby header, navigates to /history",
+    "History page route /history": "PASS - loads correctly as protected route",
+    "Leaderboard tab": "PASS - data-testid='tab-leaderboard' found, shows rows with correct data",
+    "Recent Hands tab": "PASS - data-testid='tab-hands' found, shows expandable rows",
+    "Empty states": "PASS - 'No games played yet' and 'No hands recorded yet' shown correctly",
+    "Leaderboard rows with data": "PASS - data-testid='leaderboard-row-{uid}' present, shows HANDS/BOARDS/NET CHIPS/WIN%",
+    "Recent Hands rows with data": "PASS - data-testid='hand-row-0' present, expand shows P&L",
+    "History hand fields": "PASS - table_name, pot, board_winners, players with net P&L all present",
+    "Stats fields": "PASS - hands_played, boards_won, chips_net, pots_won all present",
+    "Stats sorted by chips_net desc": "PASS - leaderboard correctly sorted",
+    "History filter by table_id": "PASS - /api/history?table_id=X returns only that table's hands",
+    "Auth guards": "PASS - create table 401 without auth, delete table 403 for non-admin"
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_mongodb_persistence_and_history.py",
+    "/app/test_reports/pytest/pytest_results_iter13.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "Minor: Dead code in _apply_action (line 560): `room.hand.contributions[uid] = room.hand.contributions.get(uid, 0)` is immediately overwritten and can be removed.",
+    "Minor: game_tables collection lacks an index on startup. Consider adding `await db.game_tables.create_index('updated_at')` in startup() for future scalability.",
+    "Note: `python-dotenv could not parse statement starting at line 3` in backend logs - harmless warning about JWT_SECRET format in .env, does not affect functionality."
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_mongodb_persistence_and_history.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (21/21 tests pass)",
+    "frontend": "100% (all features verified: Stats button, /history route, leaderboard, recent hands, empty states, expand)"
+  },
+
+  "test_credentials": {
+    "player1": "AceKing / 1111",
+    "player2": "BluffMaster / 2222",
+    "admin": "TableAdmin / 0000"
+  },
+
+  "seed_data_creation": "2 mock hand history documents inserted to MongoDB (UI_TEST_TABLE) for UI testing, then deleted. Backend tests used TEST_MongoTable_13 and TEST_PersistCheck_13 which were cleaned up. TEST_AdminCheck_13 created and cleaned up.",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "MongoDB persistence is working. Web app at /app/web/src/ (NOT /app/frontend/ which is a separate Expo project). Backend at /app/backend/server.py. The game_tables collection stores tables with string _id (the 6-char table_id). hand_history collection stores completed hands. Stats endpoint aggregates hands and returns sorted list by chips_net desc. All data-testids present and working. For UI testing: login uses custom PIN keypad (data-testid='profile-{username}' and 'pin-btn-{n}'), auto-submits on 4 digits.",
+
+  "rca_of_tests": {
+    "table_persistence": "game_rooms in-memory dict is synced with MongoDB via _save_table() (upsert) called after create/join/leave/kick. On startup, _restore_tables() reloads all tables from game_tables collection into game_rooms dict.",
+    "hand_history": "_save_hand_history() called from _finalize_showdown and _end_hand_last_player. Stores full hand record with board results, player P&L, and pot details. Stats endpoint aggregates this data on-demand.",
+    "leave_table_behavior": "When last player leaves, table is deleted from both game_rooms dict and MongoDB game_tables collection (not an error, correct behavior)."
+  }
+}

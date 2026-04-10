@@ -207,6 +207,18 @@ export default function Lobby() {
           }}>MULTIPLAYER LOBBY</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={() => navigate('/history')}
+            data-testid="stats-btn"
+            style={{
+              background: '#131a2a', border: '1px solid #1e293b',
+              borderRadius: 10, padding: '8px 16px',
+              fontSize: 12, fontWeight: 700, color: '#64748b',
+              cursor: 'pointer', letterSpacing: 0.5,
+            }}
+          >
+            Stats
+          </button>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{user.username}</div>
             <div style={{ fontSize: 12, color: '#ffb800', fontWeight: 600 }}>🪙 {user.chips.toLocaleString()}</div>
