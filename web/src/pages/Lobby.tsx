@@ -54,22 +54,59 @@ export default function Lobby() {
 
   useEffect(() => {
     if (!user?.id) return;
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/ws/${user.id}`;
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-    ws.onmessage = e => {
-      try {
-        const d = JSON.parse(e.data);
-        if (d.type === 'presence') setOnlineIds(d.online_users);
-      } catch {}
+    
+    let ws: WebSocket | null = null;
+    let pingInterval: ReturnType<typeof setInterval> | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnects = 10;
+    
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/ws/${user.id}`;
+      ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+      
+      ws.onopen = () => {
+        reconnectAttempts = 0;
+        // Start ping interval to keep connection alive
+        pingInterval = setInterval(() => {
+          if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 25000);
+      };
+      
+      ws.onmessage = e => {
+        try {
+          const d = JSON.parse(e.data);
+          if (d.type === 'presence') setOnlineIds(d.online_users);
+          // pong is silently acknowledged
+        } catch {}
+      };
+      
+      ws.onclose = (event) => {
+        if (pingInterval) clearInterval(pingInterval);
+        pingInterval = null;
+        // Auto-reconnect if not deliberate close
+        if (event.code !== 1000 && reconnectAttempts < maxReconnects) {
+          reconnectAttempts++;
+          const delay = Math.min(1000 * reconnectAttempts, 5000);
+          reconnectTimeout = setTimeout(connect, delay);
+        }
+      };
+      
+      ws.onerror = () => {};
     };
-    ws.onerror = () => {};
-
+    
+    connect();
     fetchAll();
     intervalRef.current = setInterval(fetchAll, 5000);
+    
     return () => {
-      ws.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (pingInterval) clearInterval(pingInterval);
+      ws?.close(1000);
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [user?.id, fetchAll]);

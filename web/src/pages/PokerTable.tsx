@@ -235,6 +235,7 @@ export default function PokerTable() {
   }, []);
 
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 10;
 
@@ -246,6 +247,11 @@ export default function PokerTable() {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
+    // Clear any existing ping interval
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/api/game/ws/${tableId}/${user.id}`);
@@ -255,15 +261,27 @@ export default function PokerTable() {
     ws.onopen = () => {
       setWsStatus('open');
       reconnectAttemptsRef.current = 0; // Reset attempts on successful connection
+      
+      // Start ping interval to keep connection alive (every 25 seconds)
+      pingIntervalRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 25000);
     };
 
     ws.onclose = (event) => {
       setWsStatus('closed');
+      // Clear ping interval
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
       // Auto-reconnect if not a deliberate close (code 1000 or 4001=admin deleted)
       if (event.code !== 1000 && event.code !== 4001 && reconnectAttemptsRef.current < maxReconnectAttempts) {
         reconnectAttemptsRef.current++;
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 10000); // Exponential backoff, max 10s
-        console.log(`WebSocket closed, reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`);
+        const delay = Math.min(1000 * reconnectAttemptsRef.current, 5000); // Linear backoff, max 5s
+        console.log(`WebSocket closed (code ${event.code}), reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`);
         reconnectTimeoutRef.current = setTimeout(connectWebSocket, delay);
       }
     };
@@ -277,6 +295,9 @@ export default function PokerTable() {
       try {
         const msg = JSON.parse(e.data);
         switch (msg.type) {
+          case 'pong':
+            // Heartbeat response - connection is alive
+            break;
           case 'game_state': {
             const gs = msg.data as GameState;
             setGameState(gs);
@@ -328,6 +349,9 @@ export default function PokerTable() {
     return () => {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
       }
       ws?.close(1000); // Normal close, don't reconnect
     };

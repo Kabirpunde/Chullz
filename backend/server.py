@@ -951,7 +951,13 @@ async def presence_ws(ws: WebSocket, user_id: str):
     await presence.connect(user_id, ws)
     try:
         while True:
-            await ws.receive_text()
+            raw = await ws.receive_text()
+            try:
+                msg = json.loads(raw)
+                if msg.get("type") == "ping":
+                    await ws.send_json({"type": "pong"})
+            except:
+                pass
     except WebSocketDisconnect:
         presence.disconnect(user_id)
 
