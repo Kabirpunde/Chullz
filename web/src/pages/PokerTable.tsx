@@ -215,6 +215,10 @@ export default function PokerTable() {
   const [showShowdown, setShowShowdown] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed'>('connecting');
+  
+  // Table disbanded state
+  const [tableDisbanded, setTableDisbanded] = useState(false);
+  const [disbandCountdown, setDisbandCountdown] = useState(10);
 
   // Hole card ordering for pre-assignment (drag-to-reorder)
   const [holeCardOrder, setHoleCardOrder] = useState<number[]>([]);
@@ -277,8 +281,15 @@ export default function PokerTable() {
         clearInterval(pingIntervalRef.current);
         pingIntervalRef.current = null;
       }
-      // Auto-reconnect if not a deliberate close (code 1000 or 4001=admin deleted)
-      if (event.code !== 1000 && event.code !== 4001 && reconnectAttemptsRef.current < maxReconnectAttempts) {
+      
+      // Handle admin deletion - show disbanded modal
+      if (event.code === 4001) {
+        setTableDisbanded(true);
+        return; // Don't try to reconnect
+      }
+      
+      // Auto-reconnect if not a deliberate close (code 1000)
+      if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
         reconnectAttemptsRef.current++;
         const delay = Math.min(1000 * reconnectAttemptsRef.current, 5000); // Linear backoff, max 5s
         console.log(`WebSocket closed (code ${event.code}), reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`);
@@ -371,6 +382,24 @@ export default function PokerTable() {
     }, 500);
     return () => clearInterval(interval);
   }, [gameState?.timer_ends, playTick]);
+
+  // ── Table disbanded countdown and redirect ─────────────────────────────────
+  useEffect(() => {
+    if (!tableDisbanded) return;
+    
+    const interval = setInterval(() => {
+      setDisbandCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          navigate('/lobby');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [tableDisbanded, navigate]);
 
   // ── Pre-assignment from hole card order ───────────────────────────────────
   useEffect(() => {
@@ -834,15 +863,15 @@ export default function PokerTable() {
         />
       )}
 
-      {/* WS status banner */}
-      {wsStatus === 'closed' && (
+      {/* WS status banner - hide when table is disbanded */}
+      {!tableDisbanded && wsStatus === 'closed' && (
         <div style={{
           position: 'fixed', bottom: 80, left: 0, right: 0,
           background: '#f59e0b', padding: '8px', textAlign: 'center',
           fontSize: 12, color: '#000', fontWeight: 700, zIndex: 100,
         }}>Reconnecting...</div>
       )}
-      {wsStatus === 'connecting' && (
+      {!tableDisbanded && wsStatus === 'connecting' && (
         <div style={{
           position: 'fixed', bottom: 80, left: 0, right: 0,
           background: '#3b82f6', padding: '8px', textAlign: 'center',
@@ -864,6 +893,64 @@ export default function PokerTable() {
         onReadyNextHand={handleReadyNextHand}
         onClose={() => setShowShowdown(false)}
       />
+
+      {/* ── TABLE DISBANDED MODAL ── */}
+      {tableDisbanded && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            background: '#131a2a',
+            borderRadius: 20,
+            padding: '32px 40px',
+            textAlign: 'center',
+            border: '2px solid #ef4444',
+            maxWidth: 400,
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
+            <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
+              Table Disbanded
+            </h2>
+            <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 20 }}>
+              This table has been closed by the admin.
+            </p>
+            <div style={{
+              background: '#0a0f1a',
+              borderRadius: 12,
+              padding: '16px 24px',
+              marginBottom: 20,
+            }}>
+              <p style={{ color: '#64748b', fontSize: 12, marginBottom: 4 }}>
+                Returning to lobby in
+              </p>
+              <p style={{ color: '#00f0ff', fontSize: 36, fontWeight: 900 }}>
+                {disbandCountdown}
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/lobby')}
+              style={{
+                background: '#00f0ff',
+                border: 'none',
+                borderRadius: 12,
+                padding: '12px 32px',
+                fontSize: 14,
+                fontWeight: 900,
+                color: '#0a0f1a',
+                cursor: 'pointer',
+              }}
+            >
+              Go to Lobby Now
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
