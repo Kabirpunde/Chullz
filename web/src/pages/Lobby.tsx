@@ -32,6 +32,7 @@ export default function Lobby() {
   const [maxPlayers, setMaxPlayers] = useState(6);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{id: string, name: string} | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -157,10 +158,10 @@ export default function Lobby() {
     }
   };
 
-  const deleteTable = async (tableId: string, tableName: string) => {
+  const deleteTable = async (tableId: string) => {
     if (!token || !isAdmin || deleting) return;
-    if (!window.confirm(`Delete table "${tableName}"? This will kick all players.`)) return;
     setDeleting(tableId);
+    setConfirmDelete(null);
     try {
       const res = await fetch(`/api/tables/${tableId}`, {
         method: 'DELETE',
@@ -380,24 +381,61 @@ export default function Lobby() {
                           {isPlaying ? '▶ Playing' : '⏳ Waiting'}
                         </span>
                         {isAdmin && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); deleteTable(t.table_id, t.name); }}
-                            disabled={deleting === t.table_id}
-                            data-testid={`delete-table-${t.table_id}`}
-                            title="Delete table"
-                            style={{
-                              background: '#ef444420',
-                              border: '1px solid #ef4444',
-                              borderRadius: 8,
-                              padding: '4px 8px',
-                              fontSize: 12,
-                              color: '#ef4444',
-                              cursor: deleting === t.table_id ? 'wait' : 'pointer',
-                              opacity: deleting === t.table_id ? 0.5 : 1,
-                            }}
-                          >
-                            {deleting === t.table_id ? '...' : '🗑'}
-                          </button>
+                          confirmDelete?.id === t.table_id ? (
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); deleteTable(t.table_id); }}
+                                disabled={deleting === t.table_id}
+                                data-testid={`confirm-delete-${t.table_id}`}
+                                style={{
+                                  background: '#ef4444',
+                                  border: 'none',
+                                  borderRadius: 6,
+                                  padding: '4px 10px',
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: '#fff',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {deleting === t.table_id ? '...' : 'Yes, Delete'}
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setConfirmDelete(null); }}
+                                style={{
+                                  background: '#334155',
+                                  border: 'none',
+                                  borderRadius: 6,
+                                  padding: '4px 10px',
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: '#fff',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setConfirmDelete({id: t.table_id, name: t.name}); }}
+                              disabled={deleting === t.table_id}
+                              data-testid={`delete-table-${t.table_id}`}
+                              title="Delete table"
+                              style={{
+                                background: '#ef444420',
+                                border: '1px solid #ef4444',
+                                borderRadius: 8,
+                                padding: '4px 8px',
+                                fontSize: 12,
+                                color: '#ef4444',
+                                cursor: deleting === t.table_id ? 'wait' : 'pointer',
+                                opacity: deleting === t.table_id ? 0.5 : 1,
+                              }}
+                            >
+                              {deleting === t.table_id ? '...' : '🗑'}
+                            </button>
+                          )
                         )}
                       </div>
                     </div>
