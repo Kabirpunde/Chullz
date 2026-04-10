@@ -59,8 +59,8 @@ function chipPos(angleDeg: number) {
 }
 
 // ── Small sub-components ──────────────────────────────────────────────────────
-function PlayerSeat({ player, isMine, isActive, timerProgress, timeLeft }: {
-  player: PublicPlayer; isMine: boolean; isActive: boolean; timerProgress?: number; timeLeft?: number;
+function PlayerSeat({ player, isMine, isActive, timerProgress, timeLeft, onKick }: {
+  player: PublicPlayer; isMine: boolean; isActive: boolean; timerProgress?: number; timeLeft?: number; onKick?: () => void;
 }) {
   const online = true; // seats are always shown as online during game
   const showTimer = isActive && timerProgress !== undefined && timerProgress > 0;
@@ -167,6 +167,22 @@ function PlayerSeat({ player, isMine, isActive, timerProgress, timeLeft }: {
           {player.chips.toLocaleString()}
         </span>
       </div>
+      {/* Admin kick button */}
+      {onKick && (
+        <button
+          onClick={e => { e.stopPropagation(); onKick(); }}
+          data-testid={`kick-${player.user_id}`}
+          title={`Kick ${player.username}`}
+          style={{
+            position: 'absolute', top: -4, right: -4,
+            background: '#ef444490', border: '1px solid #ef4444',
+            borderRadius: '50%', width: 18, height: 18,
+            fontSize: 9, fontWeight: 900, color: '#fff',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 20, lineHeight: 1,
+          }}
+        >✕</button>
+      )}
     </div>
   );
 }
@@ -248,10 +264,14 @@ export default function PokerTable() {
 
   // Showdown vote
   const [readyVoted, setReadyVoted] = useState(false);
+  // Spectator / kick state
+  const [takingSeat, setTakingSeat] = useState(false);
+  const [isKicked, setIsKicked] = useState(false);
 
   const { playCheck, playChips, playTick, playSubmit, playFold, muted, toggleMute } = useSoundEffects();
   const prevRoundRef = useRef('');
   const prevTimeRef = useRef(0);
+  const holeCardsRef = useRef<string[]>([]); // stable ref for WS closure comparison
 
   // ── WebSocket ──────────────────────────────────────────────────────────────
   const sendWs = useCallback((msg: unknown) => {
@@ -311,6 +331,13 @@ export default function PokerTable() {
         pingIntervalRef.current = null;
       }
       
+      // Kicked by admin
+      if (event.code === 4003) {
+        setIsKicked(true);
+        setWsStatus('open'); // suppress reconnect banner
+        return;
+      }
+
       // Handle admin deletion - show disbanded modal (don't show reconnecting)
       if (event.code === 4001) {
         setTableDisbanded(true);
@@ -356,8 +383,8 @@ export default function PokerTable() {
               setSubmitting(false);
             }
             if (gs.round === 'showdown') setValidActions(null);
-            // Close overlays and reset vote when new hand starts (round is preflop or not showdown)
-            if (gs.round === 'preflop' || gs.round === 'waiting') {
+            // Close overlay and reset vote when any non-showdown round starts
+            if (gs.round !== 'showdown') {
               setShowShowdown(false);
               setShowdownData(null);
               setReadyVoted(false);
@@ -366,8 +393,9 @@ export default function PokerTable() {
           }
           case 'hole_cards':
             const newCards = msg.data.hole_cards;
-            // Only reset order if cards actually changed
-            if (JSON.stringify(newCards) !== JSON.stringify(holeCards)) {
+            // Only reset order if cards actually changed (use ref to avoid WS reconnect on dep change)
+            if (JSON.stringify(newCards) !== JSON.stringify(holeCardsRef.current)) {
+              holeCardsRef.current = newCards;
               setHoleCards(newCards);
               setHoleCardOrder(newCards.map((_: string, i: number) => i));
             }
@@ -396,7 +424,7 @@ export default function PokerTable() {
     };
 
     return ws;
-  }, [user?.id, tableId, holeCards]);
+  }, [user?.id, tableId]);
 
   useEffect(() => {
     const ws = connectWebSocket();
@@ -492,6 +520,36 @@ export default function PokerTable() {
     sendWs({ type: 'ready_next_hand' });
   }, [sendWs]);
 
+  const handleTakeSeat = useCallback(async () => {
+    if (!token || takingSeat) return;
+    setTakingSeat(true);
+    try {
+      const res = await fetch('/api/tables/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ table_id: tableId }),
+      });
+      if (!res.ok) console.error('Take seat failed');
+      // State updates automatically via WS broadcast from backend
+    } catch (e) {
+      console.error('Take seat error:', e);
+    } finally {
+      setTakingSeat(false);
+    }
+  }, [token, tableId, takingSeat]);
+
+  const kickPlayer = useCallback(async (kickedUid: string) => {
+    if (!token) return;
+    try {
+      await fetch(`/api/tables/${tableId}/kick/${kickedUid}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (e) {
+      console.error('Kick error:', e);
+    }
+  }, [token, tableId]);
+
   // ── Hole card drag / tap-to-swap ──────────────────────────────────────────
   const handleCardDragStart = (posIdx: number) => setDragSrcIdx(posIdx);
   const handleCardDragOver = (e: React.DragEvent) => e.preventDefault();
@@ -516,6 +574,9 @@ export default function PokerTable() {
   const round = gameState?.round ?? 'waiting';
   const players = gameState?.players ?? [];
   const myPlayer = players.find(p => p.user_id === user?.id);
+  // User is a spectator if we have state but they're not in the players list
+  const isSpectator = !!gameState && !myPlayer;
+  const isAdmin = user?.role === 'admin';
   const opponents = SEAT_ANGLES.map((_, i) => {
     // Assign opponents to fixed visual slots (excluding me)
     const opps = players.filter(p => p.user_id !== user?.id);
@@ -538,10 +599,15 @@ export default function PokerTable() {
   const timerDuration = round === 'showdown' ? 120 : round === 'assignment' ? 60 : 30;
   const timerProgress = timeLeft > 0 ? timeLeft / timerDuration : 0;
 
+  // Auto-action warning: last 5 seconds on your turn
+  const toCall = callAction?.min_amount ?? 0;
+  const showAutoActionWarning = !!isMyTurn && !isSpectator && timeLeft > 0 && timeLeft <= 5;
+  const autoActionText = toCall > 0 ? `Auto-folding in ${timeLeft}s` : `Auto-checking in ${timeLeft}s`;
+
   // ── Render ────────────────────────────────────────────────────────────────
   if (!user) return null;
 
-  if (round === 'assignment') {
+  if (round === 'assignment' && !isSpectator) {
     return (
       <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#060b14' }}>
         {/* Mini header */}
@@ -734,15 +800,36 @@ export default function PokerTable() {
                 top: seatInZone(angle).y - SEAT_SIZE / 2 - 4,
                 zIndex: 10,
                 width: SEAT_SIZE,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
               }}>
-                <div style={{
-                  width: SEAT_SIZE, height: SEAT_SIZE, borderRadius: '50%',
-                  border: '2px dashed #1e293b',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <span style={{ fontSize: 16, color: '#1e293b' }}>+</span>
-                </div>
+                {isSpectator ? (
+                  <button
+                    onClick={handleTakeSeat}
+                    disabled={takingSeat}
+                    data-testid="take-seat-btn"
+                    style={{
+                      width: SEAT_SIZE, height: SEAT_SIZE, borderRadius: '50%',
+                      border: '2px dashed #00f0ff60',
+                      background: '#00f0ff0a',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: takingSeat ? 'wait' : 'pointer',
+                      flexDirection: 'column', gap: 2,
+                    }}
+                  >
+                    <span style={{ fontSize: 14 }}>+</span>
+                  </button>
+                ) : (
+                  <div style={{
+                    width: SEAT_SIZE, height: SEAT_SIZE, borderRadius: '50%',
+                    border: '2px dashed #1e293b',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ fontSize: 16, color: '#1e293b' }}>+</span>
+                  </div>
+                )}
+                {isSpectator && (
+                  <span style={{ fontSize: 9, color: '#00f0ff60', fontWeight: 700 }}>TAKE SEAT</span>
+                )}
               </div>
             );
             const isActive = opp.seat === gameState?.current_seat;
@@ -754,7 +841,12 @@ export default function PokerTable() {
                 top: pos.y - SEAT_SIZE / 2 - 4,
                 zIndex: 10,
               }}>
-                <PlayerSeat player={opp} isMine={false} isActive={isActive} timerProgress={isActive ? timerProgress : undefined} timeLeft={isActive ? timeLeft : undefined} />
+                <PlayerSeat
+                  player={opp} isMine={false} isActive={isActive}
+                  timerProgress={isActive ? timerProgress : undefined}
+                  timeLeft={isActive ? timeLeft : undefined}
+                  onKick={isAdmin ? () => kickPlayer(opp.user_id) : undefined}
+                />
               </div>
             );
           })}
@@ -770,6 +862,30 @@ export default function PokerTable() {
                 zIndex: 10,
               }}>
                 <PlayerSeat player={myPlayer} isMine={true} isActive={!!isMyTurn} timerProgress={isMyTurn ? timerProgress : undefined} timeLeft={isMyTurn ? timeLeft : undefined} />
+              </div>
+            );
+          })()}
+
+          {/* ── Spectator indicator at bottom seat ── */}
+          {isSpectator && (() => {
+            const pos = seatInZone(90);
+            return (
+              <div style={{
+                position: 'absolute',
+                left: pos.x - SEAT_SIZE / 2 - 4,
+                top: pos.y - SEAT_SIZE / 2 - 4,
+                zIndex: 10,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+              }}>
+                <div style={{
+                  width: SEAT_SIZE, height: SEAT_SIZE, borderRadius: '50%',
+                  border: '2px dashed #00f0ff50',
+                  background: '#00f0ff08',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{ fontSize: 18 }}>👁</span>
+                </div>
+                <span style={{ fontSize: 9, color: '#00f0ff80', fontWeight: 700, letterSpacing: 1 }}>SPECTATING</span>
               </div>
             );
           })()}
@@ -853,7 +969,45 @@ export default function PokerTable() {
             )}
           </div>
         )}
+
+        {/* Spectator bottom bar */}
+        {isSpectator && (
+          <div style={{
+            textAlign: 'center', padding: '14px 16px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+          }}>
+            <div style={{ fontSize: 10, color: '#00f0ff80', fontWeight: 700, letterSpacing: 2 }}>SPECTATOR MODE</div>
+            {(gameState?.max_players ?? 6) > players.length && (
+              <button
+                onClick={handleTakeSeat}
+                disabled={takingSeat}
+                data-testid="take-seat-bottom-btn"
+                style={{
+                  background: takingSeat ? '#1e293b' : '#00f0ff',
+                  border: 'none', borderRadius: 12,
+                  padding: '12px 28px', fontSize: 13, fontWeight: 900,
+                  color: takingSeat ? '#475569' : '#0a0f1a',
+                  cursor: takingSeat ? 'wait' : 'pointer',
+                }}
+              >
+                {takingSeat ? 'Taking seat...' : '+ Take a Seat'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* ── AUTO-ACTION WARNING ── */}
+      {showAutoActionWarning && (
+        <div style={{
+          textAlign: 'center', padding: '6px 14px',
+          background: toCall > 0 ? '#ef4444' : '#f59e0b',
+          color: '#fff', fontSize: 12, fontWeight: 900,
+          letterSpacing: 0.5, flexShrink: 0,
+        }}>
+          {autoActionText}
+        </div>
+      )}
 
       {/* ── ACTION BAR ── */}
       {!showRaise && isMyTurn && validActions && (
@@ -929,10 +1083,35 @@ export default function PokerTable() {
         timerEnds={gameState?.timer_ends ?? 0}
         showdownReady={gameState?.showdown_ready ?? []}
         totalPlayers={players.length}
-        alreadyVoted={readyVoted}
+        alreadyVoted={readyVoted || isSpectator}
         onReadyNextHand={handleReadyNextHand}
         onClose={() => setShowShowdown(false)}
       />
+
+      {/* ── KICKED MODAL ── */}
+      {isKicked && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div style={{
+            background: '#131a2a', borderRadius: 20, padding: '32px 40px',
+            textAlign: 'center', border: '2px solid #f59e0b', maxWidth: 400,
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
+            <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 900, marginBottom: 12 }}>Removed from Table</h2>
+            <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 24 }}>You were removed by the admin.</p>
+            <button
+              onClick={() => navigate('/lobby')}
+              style={{
+                background: '#00f0ff', border: 'none', borderRadius: 12,
+                padding: '12px 32px', fontSize: 14, fontWeight: 900,
+                color: '#0a0f1a', cursor: 'pointer',
+              }}
+            >Back to Lobby</button>
+          </div>
+        </div>
+      )}
 
       {/* ── TABLE DISBANDED MODAL ── */}
       {tableDisbanded && (

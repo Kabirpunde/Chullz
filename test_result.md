@@ -281,7 +281,7 @@ agent_communication:
          - Mobile (<768px): single column stacked layout
       5. Both views confirmed working with screenshots.
       
-      Preview URL: https://card-battle-arena-76.preview.emergentagent.com
+      Preview URL: https://card-game-live-1.preview.emergentagent.com
       (Or click Preview button in the Emergent interface)
       
   - agent: "main"
@@ -308,7 +308,7 @@ agent_communication:
       5. All screen sizes properly handled with max-width: 480px container
       
       Test credentials: AceKing=1111, BluffMaster=2222, CardShark=3333, TableAdmin=0000
-      Web app URL: https://card-battle-arena-76.preview.emergentagent.com
+      Web app URL: https://card-game-live-1.preview.emergentagent.com
       
       Test sequence:
       1. Login screen shows profile grid -> click profile -> PIN modal appears -> enter 1111 -> navigate to lobby

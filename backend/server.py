@@ -383,9 +383,10 @@ async def _start_hand(room: GameRoom):
     for uid, cards in hole_cards.items():
         await _send(room, uid, {"type": "hole_cards", "data": {"hole_cards": cards}})
 
+    # Set timer BEFORE broadcast so clients receive the correct timer_ends
+    await _start_timer(room, 30, _auto_fold(room.table_id, room.current_seat, room.hand_number))
     await _broadcast_state(room)
     await _send_valid_actions(room)
-    await _start_timer(room, 30, _auto_fold(room.table_id, room.current_seat, room.hand_number))
 
 
 async def _send_valid_actions(room: GameRoom):
@@ -489,9 +490,10 @@ async def _apply_action(room: GameRoom, uid: str, action: str, amount: int):
         await _advance_round(room)
     else:
         room.current_seat = _next_active_seat(room, room.current_seat)  # next player after current
+        # Set timer BEFORE broadcast so clients receive correct timer_ends
+        await _start_timer(room, 30, _auto_fold(room.table_id, room.current_seat, room.hand_number))
         await _broadcast_state(room)
         await _send_valid_actions(room)
-        await _start_timer(room, 30, _auto_fold(room.table_id, room.current_seat, room.hand_number))
 
 
 async def _advance_round(room: GameRoom):
@@ -533,9 +535,10 @@ async def _advance_round(room: GameRoom):
         return
 
     room.current_seat = _first_to_act(room, post_flop=True)
+    # Set timer BEFORE broadcast so clients receive correct timer_ends
+    await _start_timer(room, 30, _auto_fold(room.table_id, room.current_seat, room.hand_number))
     await _broadcast_state(room)
     await _send_valid_actions(room)
-    await _start_timer(room, 30, _auto_fold(room.table_id, room.current_seat, room.hand_number))
 
 
 async def _start_assignment(room: GameRoom):
@@ -835,17 +838,20 @@ async def join_table(req: JoinTableReq, cu: dict = Depends(get_current_user)):
     room = game_rooms.get(req.table_id)
     if not room:
         raise HTTPException(404, "Table not found")
-    if room.status == "playing":
-        raise HTTPException(400, "Game already in progress")
     if len(room.players) >= room.max_players:
         raise HTTPException(400, "Table full")
     if room.by_uid(cu["id"]):
         return {"table_id": req.table_id, "seat": room.by_uid(cu["id"]).seat}  # already joined
     seat = next(s for s in range(room.max_players) if not room.by_seat(s))
+    # Join as sitting_out if mid-game so the current hand is unaffected
+    player_status = "sitting_out" if room.status == "playing" else "waiting"
     room.players.append(GPlayer(
         user_id=cu["id"], username=cu["username"], avatar=cu["avatar"],
         avatar_color=cu["avatar_color"], seat=seat, chips=room.starting_chips,
+        status=player_status,
     ))
+    # Broadcast updated player list to all connected clients (including spectators)
+    await _broadcast_state(room)
     return {"table_id": req.table_id, "seat": seat}
 
 
@@ -886,6 +892,28 @@ async def delete_table(table_id: str, cu: dict = Depends(get_current_user)):
     # Remove the table
     del game_rooms[table_id]
     return {"success": True, "message": f"Table {table_id} deleted"}
+
+
+@api.post("/tables/{table_id}/kick/{kicked_uid}")
+async def kick_player(table_id: str, kicked_uid: str, cu: dict = Depends(get_current_user)):
+    """Admin-only endpoint to kick a player/spectator from a table"""
+    if cu.get("role") != "admin":
+        raise HTTPException(403, "Admin access required")
+    room = game_rooms.get(table_id)
+    if not room:
+        raise HTTPException(404, "Table not found")
+    # Close WebSocket for kicked user
+    if kicked_uid in room.connections:
+        ws = room.connections[kicked_uid]
+        try:
+            await ws.close(code=4003, reason="Kicked by admin")
+        except Exception:
+            pass
+        room.connections.pop(kicked_uid, None)
+    # Remove from players list if they were a player
+    room.players = [p for p in room.players if p.user_id != kicked_uid]
+    await _broadcast_state(room)
+    return {"success": True, "message": f"Player {kicked_uid} kicked"}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -955,8 +983,10 @@ async def game_ws(ws: WebSocket, table_id: str, user_id: str):
                     room.showdown_ready.add(user_id)
                     await _broadcast_state(room)
                     # If all connected players have voted, start next hand in 5s
-                    connected_uids = set(room.connections.keys())
-                    if connected_uids and connected_uids.issubset(room.showdown_ready):
+                    # Only count actual players (not spectators) for ready check
+                    player_uids = {p.user_id for p in room.players}
+                    connected_player_uids = set(room.connections.keys()) & player_uids
+                    if connected_player_uids and connected_player_uids.issubset(room.showdown_ready):
                         if room.timer_task and not room.timer_task.done():
                             room.timer_task.cancel()
                         await _start_timer(room, 5, _next_hand_auto(room.table_id, room.hand_number, 5))

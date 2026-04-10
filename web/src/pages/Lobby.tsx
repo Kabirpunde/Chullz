@@ -472,21 +472,20 @@ export default function Lobby() {
                     </div>
 
                     <button
-                      onClick={() => isInTable ? navigate(`/table/${t.table_id}`) : canJoin ? joinTable(t.table_id) : null}
-                      disabled={!isInTable && !canJoin || joining === t.table_id}
+                      onClick={() => navigate(`/table/${t.table_id}`)}
                       data-testid={`table-btn-${t.table_id}`}
                       style={{
-                        background: isInTable ? '#00f0ff' : canJoin ? '#00f0ff' : '#131a2a',
-                        border: isInTable || canJoin ? 'none' : '1px solid #334155',
+                        background: isInTable ? '#00f0ff' : '#1e3a5f',
+                        border: isInTable ? 'none' : '1px solid #3b82f6',
                         borderRadius: 12, padding: '12px',
                         fontSize: 14, fontWeight: 900,
-                        color: isInTable || canJoin ? '#0a0f1a' : '#475569',
-                        cursor: isInTable || canJoin ? 'pointer' : 'default',
+                        color: isInTable ? '#0a0f1a' : '#93c5fd',
+                        cursor: 'pointer',
                         transition: 'opacity 0.15s',
                         width: '100%',
                       }}
                     >
-                      {joining === t.table_id ? 'Joining...' : isInTable ? '↩ Return to Table' : isFull ? 'Table Full' : isPlaying ? 'Game In Progress' : 'Join Table →'}
+                      {isInTable ? '↩ Return to Table' : '👁 View Table'}
                     </button>
                   </div>
                 );

@@ -1,120 +1,151 @@
-<analysis>**original_problem_statement**: 
-The user is building a real-time online multiplayer poker app called Chullz — a custom Texas Hold'em variant with 3 independent community boards (Flop, Turn, River). Players get 6 hole cards and assign 2 to each board. Tech stack involves FastAPI + WebSockets backend, React Native (Expo) frontend, and a dark PPPoker theme. 
-*Latest User Request & Product Requirements:* The user requested the poker table UI to be refactored into a vertical (portrait) oval with all 3 community boards vertically stacked inside the felt, and player seats on the edges. After verifying the UI fix, the user asked to call the Deployer Agent and run a Health Check to confirm readiness for deployment.
+<analysis>Here is the handover summary based on the conversation history.
+
+### **original_problem_statement**
+Build Chullz — a free-to-play, real-time multiplayer online poker variant card game with 3 independent community boards. The game needs to support user accounts, game rooms, a multiplayer lobby, real-time WebSocket gameplay, and an admin view. 
+**Product Requirements**: 6 hole cards dealt face-up to each player, players assign 2 cards to each of 3 boards (1-minute timer), Pot Limit betting, 1 point per board won, most points wins the pot.
 
 **User's preferred language**: English
-*(INSTRUCTING NEXT AGENT: You MUST respond in English only)*
+*(INSTRUCTION to next agent: ALWAYS respond in English)*
 
-**what currently exists?**: 
-A fully functional multiplayer poker game with real-time WebSockets, pot-limit betting, and specialized 3-board logic. The main gameplay UI () has been completely overhauled to feature a portrait vertical oval table with exactly 3 vertically stacked community boards. The game successfully underwent automated UI testing via the frontend testing agent and passed a pre-deployment health check.
+### **what currently exists?**
+A fully functional multiplayer poker web application. It features a React/Vite frontend () and a FastAPI/WebSocket backend (). The app includes profile-based PIN authentication, a real-time lobby, active/waiting tables, drag-and-drop hole card reordering, betting action buttons, dynamic circular timers, sound toggles, and admin controls for deleting tables. Background WebSocket keep-alive (ping/pong) is implemented for connection stability.
 
-**Last working item**:
-    - Last item agent was working: Running the deployment health check using the  and verifying its flags to ensure the app is ready for production deployment.
-    - Status: USER VERIFICATION PENDING (Agent completed the checks and concluded readiness, waiting for user's next command)
-    - Agent Testing Done: Y
-    - Which testing method agent to use?: NA (Testing and health checks already completed)
-    - User Testing Done: N
+### **Last working item**
+- **Last item agent was working**: Fixing the end-of-hand overlay UI (Showdown/Uncontested Win). The user reported that the result windows stay open despite both players voting for the next hand, blocking the view of the new hand. The agent was actively investigating  and  to automatically close overlays when a new hand starts.
+- **Status**: IN PROGRESS
+- **Agent Testing Done**: N
+- **Which testing method agent to use?**: Frontend testing agent / screenshot tool. Use  with  to click through the login and game states.
+- **User Testing Done**: N
 
-**All Pending/In progress Issue list**:
-  None (All critical P0 issues are resolved and the app is healthy).
+### **All Pending/In progress Issue list**
+**Priority:** P0
 
-**In progress Task List**:
-  None
+**Issue Detail:**
+- **Issue 1: Showdown / Result window does not auto-close**
+  - **Attempted fixes**: Agent modified  to set  when , but the modal still hangs open when the new hand starts, overlaying the active game.
+  - **Next debug checklist**: 
+    - Check  where  and  are toggled.
+    - Check  to verify if internal countdowns or allReady states are failing to trigger the unmount callback properly on hand reset.
+  - **Why fix this issue and what will be achieved with the fix?**: Players cannot see their new cards or take actions if the previous hand's result screen remains stuck on their screen.
+  - **Status**: IN PROGRESS
+  - **Is recurring issue?**: N
+  - **Should Test frontend/backend/both after fix?**: Frontend (Screenshot tool).
+  - **Blocked on other issue**: None
 
-**Upcoming and Future Tasks**:
-    Future Tasks:
-    - P2: Add card dealing animations and chip movement animations.
-    - P2: Implement a quick-assign button (Auto-Assign Best) for optimal hole-card assignment logic.
-    - P2: Add a hand history log for player review.
-    - P2: Optimize MongoDB queries (add missing field projections and limits) as flagged by the deployment agent.
-    - P2: Restrict CORS origins in production (currently set to ).
+- **Issue 2: Timer does not reset properly per player's turn**
+  - **Attempted fixes**: None yet.
+  - **Next debug checklist**: Check  inside  and . Currently, the small blind's remaining time seems to roll over to the big blind, rather than granting the next player a fresh 30-second window. Ensure  parameter correctly calculates a full 30 seconds for the new actor rather than remaining pot time.
+  - **Why fix this issue and what will be achieved with the fix?**: Ensures fair play by giving every player their guaranteed 30 seconds to act.
+  - **Status**: NOT STARTED
+  - **Is recurring issue?**: N
+  - **Should Test frontend/backend/both after fix?**: Both (Backend logic, Frontend visual).
+  - **Blocked on other issue**: None
 
-**Completed work in this session**:
-- Refactored  to render a vertical (portrait) oval table using dynamic . (DONE)
-- Positioned 3 community boards vertically stacked inside the table felt. (DONE)
-- Fixed seating positioning so player avatars sit at the correct angles on the edge of the vertical oval. (DONE)
-- Updated  and ran the frontend testing agent which verified all 8 requested UI features. (DONE)
-- Ran the  health check, investigated its flags, and validated that all required services, endpoints, and variables are working correctly for the Emergent platform. (DONE)
-- Updated  with the latest task completion statuses. (DONE)
+### **In progress Task List**
+*(No additional tasks are actively in progress outside of the issues listed above)*
 
-**Earlier issues found/mentioned but not fixed**:
-   Issue 1: 
-   - Debug checklist: React Native console shows warnings about  style props being deprecated.
-   - Why to solve this issue and what will be achieved with this?: Removes console warnings and future-proofs the styling using standard .
-   - Should Test frontend/backend/both after fix: Frontend
-   - Is recurring issue?: N
+### **Upcoming and Future Tasks**
+**Upcoming Tasks:**
+1. **Spectator Mode (P1)**: Allow users to watch active tables they are not seated at.
+2. **Auto-checking in Xs visual warning (P2)**: Provide a warning toast/indicator when a player is close to timing out.
+3. **Kick Player Functionality (P2)**: Add ability for admin to kick individual players from a table (not just disband the whole table).
 
-**Known issue recurrence from previous fork**:
-  - Issue recurrence in previous fork: Bson vs PyMongo package collision ( import error).
-  - Recurrence count: 1
-  - Status: RESOLVED
+**Future Tasks:**
+1. Game history/stats tracking dashboard.
+2. AI bot player option for single-player practice.
+3. Quick Match feature to auto-match players without the lobby manual join process.
 
-**Code Architecture**:
+### **Completed work in this session**
+- Switched Supervisor configuration to point to the Vite Web App () instead of the React Native Expo app.
+- **WebSocket Action matching (DONE)**: Fixed  vs  payload mismatch.
+- **Timer Visuals (DONE)**: Changed timer from top bar to a receding circular cyan ring around the active player with seconds text display.
+- **Frontend Reload Bug (DONE)**: Removed  completely and switched Supervisor command from yarn run v1.22.22
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command. to yarn run v1.22.22
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command. to stop Vite HMR from auto-reloading the page during gameplay.
+- **Sound Fixes (DONE)**: Added a mute button and fixed  closure bug.
+- **Admin Table Delete (DONE)**: Added an inline visual confirmation Delete Table button for the TableAdmin role and implemented backend disband/WebSocket close handling.
+- **Connection Persistence (DONE)**: Added a 15-second Ping/Pong heartbeat to bypass Nginx idle timeouts and added linear backoff auto-reconnect without ugly banners.
+- **Auto-fold/Check (DONE)**: Fixed a KeyError ( vs ) causing auto-fold to crash. Game now correctly checks (if 0 to call) or folds (if > 0 to call) when 30 seconds expire.
+- **Return to Table (DONE)**: Lobby now displays a ↩ Return to Table button for tables the user is already seated in.
+
+### **Earlier issues found/mentioned but not fixed**
+- **Issue 1**: Small blind's remaining time rolling over to the big blind (Described in Pending Issues).
+
+### **Known issue recurrence from previous fork**
+- **Issue recurrence in previous fork**: Playwright browser context wiping  JWT tokens on each screenshot navigation.
+- **Recurrence count**: 2
+- **Status**: RESOLVED (Agent created  specifying how to bypass this using specific  attributes with  directly on UI buttons).
+
+### **Code Architecture**
+
+
+### **Key Technical Concepts**
+React (Frontend), Vite (Bundler), FastAPI (Backend), WebSockets (Real-time syncing, Ping/Pong Keepalive), MongoDB (Database), Playwright (E2E Screenshot Testing).
+
+### **key DB schema**
+- :  (Mainly seeded in-memory for preview)
+- :  (In-memory Python dictionary tracking table states; resets on backend restart).
+
+### **changes in tech stack**
+-  was completely uninstalled and removed to fix aggressive caching and page refreshes.
+- Frontend running command changed from yarn run v1.22.22
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command. (HMR) to yarn run v1.22.22
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command. (Static distribution).
+
+### **All files of reference**
+-  (Contains core game UI, WebSocket handlers, timer ring UI).
+-  (Contains table creation, Return to table, Admin deletion).
+-  (Contains WebSocket Ping/Pong, auto-fold handlers, timer routing).
+-  (Currently buggy file; fails to close on next hand).
+-  (Modified for Mute state referencing).
+-  (Created to instruct Playwright on auth steps).
+
+### **Areas that need refactoring**
+- Backend Game State is entirely stored in memory (). Restarting the backend completely wipes all active tables. Moving state to MongoDB is highly recommended for production resilience.
+
+### **key api endpoints**
+-  (Table-specific WebSocket)
+-  (Lobby/Presence WebSocket)
+-  (Admin only table teardown)
+
+### **Critical Info for New Agent**
+1. **DO NOT** restart the backend supervisor unless absolutely necessary. Restarting it drops all in-memory WebSocket connections and deletes active poker tables.
+2. The web frontend lives in . Ignore  as it's a legacy React Native codebase.
+3. To test authentication flows, do not rely on standard typing. Use the  buttons in the  screen with  (Reference ).
+4. The admin account user is .
+
+### **documents and test reports created in this job**
 - 
-  -  (FastAPI + WebSocket endpoints)
-  -  (Chullz 3-board game logic, pot calculations)
 - 
-  -  (Login with custom PIN pad)
-  -  (Table creation and joining)
-  -  (Main gameplay screen, heavily refactored for vertical layout)
-  -  (, , , )
-  -  
+- 
+- 
 
-**Key Technical Concepts**:
-React Native (Expo), WebSockets (Real-time Multiplayer), FastAPI, MongoDB, Custom UI (Dynamic absolute positioning calculated via React ).
+### **Last 10 User Messages and any pending HUMAN messages**
+1. **User**: When a table is closed, we need to gracefully close the table... (Completed)
+2. **User**: Im still seeing a blue and yellow banner reconnecting. Additionally if a users time runs out, the seems to end the hand... (Completed)
+3. **User**: The yellow and blue banner is not for a disbanded table, i see it even in tables taht are actively running... (Completed)
+4. **User**: Auto checking is not running when timer runs out. Also show time in seconds on every countdown. (Completed)
+5. **User**: added credits (Acknowledged)
+6. **User**: Time ran out, still no autocheck (Completed)
+7. **User**: There is something wrong with the timer and turns. As of now the small blinds remaining time goes to the big blind after his action. Each individual playable turn should be allowed 30 seconds... showdown window or result window should auto close. (IN PROGRESS - Pending completion by next agent).
 
-**key DB schema**:
-  - : {username, pin, chips, avatar, role}
+### **Project Health Check:**
+- **Broken**: End-of-hand Showdown overlay failing to close automatically. Turn-timer inheriting previous player's remaining time instead of resetting to 30s.
+- **Mocked**: None.
 
-**changes in tech stack**:
-  - None.
+### **3rd Party Integrations**
+- None present.
 
-**All files of reference**:
-  -  (Refactored extensively for vertical layout logic)
-  -  (Verified CORS setup)
-  -  (Updated)
-  -  (Updated)
+### **Testing status**
+- **Testing agent used after significant changes**: YES (Testing Agent V3 was used early on, but later fixes were evaluated primarily via the screenshot tool due to session reset constraints).
+- **Troubleshoot agent used after agent stuck in loop**: NO
+- **Test files created**: 
+- **Known regressions**: None currently identified from previous functioning state.
 
-**Areas that need refactoring**:
-  - Database queries in the backend could use explicit field projections and limits (flagged during deployment check).
-  - Styles using , , etc., should be refactored to  in frontend components.
+### **Credentials to test flow:**
+- Main Test Account: Profile 
+- Admin Account: Profile 
+- *(All PINs bypass via simple UI click logic referenced in )*
 
-**key api endpoints**:
-  - WS 
-
-**Critical Info for New Agent**:
-- **Health Check Flags:** The deployment agent flagged a missing  and missing . The previous agent thoroughly verified these and concluded they are **false positives/non-blockers**. The app uses  properly, and permissive CORS is intentionally set in . The app is officially healthy and ready for deployment.
-- **UI State:** The table is now a vertical/portrait oval with stacked boards inside the felt. Automated UI tests have passed.
-- **Login Flow:** The app utilizes a custom numeric PIN pad. 
-
-**documents and test reports created in this job**:
-  - 
-  - 
-
-**Last 10 User Messages and any pending HUMAN messages**:
- 1. User: Please use ask_human tool and confirm your plan now. (COMPLETED)
- 2. User: [Tool result: Question has been sent to the user. Waiting for response] (COMPLETED)
- 3. User: go for it, but make sure our green tavle with felt is vertical and all board appear vertically stacked on the table (COMPLETED)
- 4. User: Call Deployer Agent and Run Health Check to Check for Readiness for Deployment (COMPLETED - Health check passed)
-
-**Project Health Check**:
-  - Backend: Healthy & fully tested.
-  - Frontend: Healthy & verified vertical layout.
-  - Database: Healthy (7 players seeded).
-
-**3rd Party Integrations**: 
-  - None required.
-
-**Testing status**:
-  - Testing agent used after significant changes: YES ( used to verify UI changes)
-  - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: None
-  - Known regressions: None
-
-**Credentials to test flow**:
-  - AceKing: 
-  - BluffMaster: 
-  - TableAdmin: 
-
-**What agent forgot to execute**:
-Nothing. The agent successfully refactored the UI, verified it using screenshots and the frontend testing agent, updated documentation, and ran the final deployment health check requested by the user.</analysis>
+### **What agent forgot to execute**
+The agent was asked to fix the timer inheritance issue (small blinds remaining time goes to the big blind after his action) but focused primarily on the Showdown Overlay UI bug before the context window filled up. The backend logic for  needs addressing for per-user turn resets.</analysis>

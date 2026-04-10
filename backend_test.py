@@ -11,7 +11,7 @@ import time
 from datetime import datetime
 
 class ChullzAPITester:
-    def __init__(self, base_url="https://card-battle-arena-76.preview.emergentagent.com"):
+    def __init__(self, base_url="https://card-game-live-1.preview.emergentagent.com"):
         self.base_url = base_url
         self.token = None
         self.user_data = None
