@@ -356,8 +356,12 @@ export default function PokerTable() {
               setSubmitting(false);
             }
             if (gs.round === 'showdown') setValidActions(null);
-            // Reset vote when new hand starts (round no longer showdown)
-            if (gs.round !== 'showdown') setReadyVoted(false);
+            // Close overlays and reset vote when new hand starts (round is preflop or not showdown)
+            if (gs.round === 'preflop' || gs.round === 'waiting') {
+              setShowShowdown(false);
+              setShowdownData(null);
+              setReadyVoted(false);
+            }
             break;
           }
           case 'hole_cards':
