@@ -234,15 +234,44 @@ export default function PokerTable() {
     }
   }, []);
 
-  useEffect(() => {
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 10;
+
+  const connectWebSocket = useCallback(() => {
     if (!user?.id || !tableId) return;
+    
+    // Clear any existing reconnect timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/api/game/ws/${tableId}/${user.id}`);
     wsRef.current = ws;
     setWsStatus('connecting');
 
-    ws.onopen = () => setWsStatus('open');
-    ws.onclose = () => setWsStatus('closed');
+    ws.onopen = () => {
+      setWsStatus('open');
+      reconnectAttemptsRef.current = 0; // Reset attempts on successful connection
+    };
+
+    ws.onclose = (event) => {
+      setWsStatus('closed');
+      // Auto-reconnect if not a deliberate close (code 1000 or 4001=admin deleted)
+      if (event.code !== 1000 && event.code !== 4001 && reconnectAttemptsRef.current < maxReconnectAttempts) {
+        reconnectAttemptsRef.current++;
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 10000); // Exponential backoff, max 10s
+        console.log(`WebSocket closed, reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`);
+        reconnectTimeoutRef.current = setTimeout(connectWebSocket, delay);
+      }
+    };
+
+    ws.onerror = () => {
+      // Error will be followed by onclose, so just log it
+      console.warn('WebSocket error');
+    };
 
     ws.onmessage = e => {
       try {
@@ -291,8 +320,18 @@ export default function PokerTable() {
       } catch {}
     };
 
-    return () => ws.close();
-  }, [user?.id, tableId]);
+    return ws;
+  }, [user?.id, tableId, holeCards]);
+
+  useEffect(() => {
+    const ws = connectWebSocket();
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      ws?.close(1000); // Normal close, don't reconnect
+    };
+  }, [connectWebSocket]);
 
   // ── Countdown timer ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -775,9 +814,16 @@ export default function PokerTable() {
       {wsStatus === 'closed' && (
         <div style={{
           position: 'fixed', bottom: 80, left: 0, right: 0,
-          background: '#ef4444', padding: '8px', textAlign: 'center',
+          background: '#f59e0b', padding: '8px', textAlign: 'center',
+          fontSize: 12, color: '#000', fontWeight: 700, zIndex: 100,
+        }}>Reconnecting...</div>
+      )}
+      {wsStatus === 'connecting' && (
+        <div style={{
+          position: 'fixed', bottom: 80, left: 0, right: 0,
+          background: '#3b82f6', padding: '8px', textAlign: 'center',
           fontSize: 12, color: '#fff', fontWeight: 700, zIndex: 100,
-        }}>Connection lost — refresh to reconnect</div>
+        }}>Connecting...</div>
       )}
 
       {/* ── SHOWDOWN OVERLAY ── */}

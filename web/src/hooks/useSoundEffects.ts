@@ -1,13 +1,16 @@
-import { useCallback, useRef, useState, useEffect } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 // Global mute state stored in localStorage
 const MUTE_KEY = 'chullz_muted';
 
 export function useSoundEffects() {
   const ctxRef = useRef<AudioContext | null>(null);
+  const mutedRef = useRef(false);
   const [muted, setMuted] = useState(() => {
     try {
-      return localStorage.getItem(MUTE_KEY) === 'true';
+      const stored = localStorage.getItem(MUTE_KEY) === 'true';
+      mutedRef.current = stored;
+      return stored;
     } catch {
       return false;
     }
@@ -16,6 +19,7 @@ export function useSoundEffects() {
   const toggleMute = useCallback(() => {
     setMuted(prev => {
       const next = !prev;
+      mutedRef.current = next;
       try {
         localStorage.setItem(MUTE_KEY, String(next));
       } catch {}
@@ -23,8 +27,8 @@ export function useSoundEffects() {
     });
   }, []);
 
-  const getCtx = (): AudioContext | null => {
-    if (muted) return null;
+  const getCtx = useCallback((): AudioContext | null => {
+    if (mutedRef.current) return null;
     try {
       if (!ctxRef.current || ctxRef.current.state === 'closed') {
         ctxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -36,7 +40,7 @@ export function useSoundEffects() {
     } catch {
       return null;
     }
-  };
+  }, []);
 
   /** Double-tap beep for CHECK */
   const playCheck = useCallback(() => {
@@ -57,7 +61,7 @@ export function useSoundEffects() {
         osc.stop(ac.currentTime + delay + 0.12);
       } catch {}
     });
-  }, []);
+  }, [getCtx]);
 
   /** Chip clink for BET / CALL / RAISE */
   const playChips = useCallback((count = 3) => {
@@ -86,7 +90,7 @@ export function useSoundEffects() {
         src.start(ac.currentTime + delay);
       } catch {}
     }
-  }, []);
+  }, [getCtx]);
 
   /** Short tick for countdown (last 15s) */
   const playTick = useCallback(() => {
@@ -104,7 +108,7 @@ export function useSoundEffects() {
       osc.start();
       osc.stop(ac.currentTime + 0.05);
     } catch {}
-  }, []);
+  }, [getCtx]);
 
   /** Rising chord for SUBMIT ASSIGNMENT */
   const playSubmit = useCallback(() => {
@@ -125,7 +129,7 @@ export function useSoundEffects() {
         osc.stop(ac.currentTime + delay + 0.4);
       } catch {}
     });
-  }, []);
+  }, [getCtx]);
 
   /** Fold whoosh */
   const playFold = useCallback(() => {
@@ -144,7 +148,7 @@ export function useSoundEffects() {
       osc.start();
       osc.stop(ac.currentTime + 0.25);
     } catch {}
-  }, []);
+  }, [getCtx]);
 
   return { playCheck, playChips, playTick, playSubmit, playFold, muted, toggleMute };
 }
