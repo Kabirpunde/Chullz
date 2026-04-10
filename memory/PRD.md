@@ -76,7 +76,10 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 
 ## Remaining / Upcoming Tasks
 
-### P3 Future / Backlog
+### Phase 4 (Rules & UX — 2026-05-xx)
+- **Inline Assignment** — Removed separate full-screen AssignmentPanel; confirm button now appears inline on the main table below hole cards; drag-to-swap works in-place
+- **Omaha Rules** — `best_hand_omaha()` requires exactly both hole cards + 3 community cards; single-card flushes/straights impossible
+- **Player-relative descriptions** — `_desc5_omaha()` uses player's highest hole card for flush/high-card "high" descriptors; all other hand types unchanged
 - Game history/stats tracking dashboard
 - AI bot player for solo practice  
 - Quick Match auto-matchmaking
