@@ -275,18 +275,20 @@ export default function PokerTable() {
     };
 
     ws.onclose = (event) => {
-      setWsStatus('closed');
       // Clear ping interval
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
         pingIntervalRef.current = null;
       }
       
-      // Handle admin deletion - show disbanded modal
+      // Handle admin deletion - show disbanded modal (don't show reconnecting)
       if (event.code === 4001) {
         setTableDisbanded(true);
+        setWsStatus('open'); // Keep as 'open' to hide reconnecting banner
         return; // Don't try to reconnect
       }
+      
+      setWsStatus('closed');
       
       // Auto-reconnect if not a deliberate close (code 1000)
       if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
