@@ -754,6 +754,7 @@ class CreateTableReq(BaseModel):
 
 class JoinTableReq(BaseModel):
     table_id: str
+    preferred_seat: Optional[int] = None
 
 class DistributeChipsReq(BaseModel):
     target_username: str
@@ -842,7 +843,18 @@ async def join_table(req: JoinTableReq, cu: dict = Depends(get_current_user)):
         raise HTTPException(400, "Table full")
     if room.by_uid(cu["id"]):
         return {"table_id": req.table_id, "seat": room.by_uid(cu["id"]).seat}  # already joined
-    seat = next(s for s in range(room.max_players) if not room.by_seat(s))
+    # Resolve which seat to take
+    if req.preferred_seat is not None:
+        if req.preferred_seat < 0 or req.preferred_seat >= room.max_players:
+            raise HTTPException(400, "Invalid seat number")
+        if room.by_seat(req.preferred_seat) is not None:
+            raise HTTPException(400, "Seat already taken")
+        seat = req.preferred_seat
+    else:
+        avail = [s for s in range(room.max_players) if not room.by_seat(s)]
+        if not avail:
+            raise HTTPException(400, "Table full")
+        seat = avail[0]
     # Join as sitting_out if mid-game so the current hand is unaffected
     player_status = "sitting_out" if room.status == "playing" else "waiting"
     room.players.append(GPlayer(

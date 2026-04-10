@@ -1,0 +1,111 @@
+{
+  "summary": "Iteration 11 testing: Verified two new improvements - (1) spectator seat positioning using SEAT_TO_ANGLE mapping and (2) preferred seat selection via POST /api/tables/join. All 10 backend API tests and all 11 frontend UI tests PASS.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Spectator empty seat labels",
+        "issues": ["Seat labels show 1-based numbering (SEAT 2 through SEAT 6 for seats 1-5) while data-testid uses 0-based (take-seat-1 through take-seat-5). This is intentional for UX but worth noting."]
+      }
+    ]
+  },
+
+  "features_tested": {
+    "lobby_view_table_button": {
+      "status": "PASS",
+      "detail": "Lobby shows '👁 View Table' for users NOT in table, '↩ Return to Table' (cyan) for users already in table. Navigating via View Table enters spectator mode without calling join API."
+    },
+    "spectating_badge": {
+      "status": "PASS",
+      "detail": "SPECTATING badge (👁 SPECTATING) visible in top bar when user visits table without joining."
+    },
+    "spectator_empty_seat_buttons": {
+      "status": "PASS",
+      "detail": "Empty seats shown as labeled dashed circle buttons with data-testid='take-seat-0' through 'take-seat-5'. Labels show 'SEAT N+1' (1-based: SEAT 2, SEAT 3, etc.). AceKing at seat 0 (top) leaves 5 empty seat buttons visible."
+    },
+    "spectator_player_positions": {
+      "status": "PASS",
+      "detail": "Players rendered via players.map() using SEAT_TO_ANGLE: seat 0=-90° (top), 1=-45° (upper-right), 2=0° (right), 3=90° (bottom), 4=135° (lower-left), 5=-135° (left). AceKing at seat 0 correctly appears at TOP of oval."
+    },
+    "preferred_seat_4": {
+      "status": "PASS",
+      "detail": "POST /api/tables/join with preferred_seat=4 returns {seat: 4}. Backend assigns exactly the requested seat."
+    },
+    "preferred_seat_taken_400": {
+      "status": "PASS",
+      "detail": "POST /api/tables/join with preferred_seat=4 when seat 4 already taken returns 400 with 'Seat already taken'."
+    },
+    "preferred_seat_invalid_99": {
+      "status": "PASS",
+      "detail": "POST /api/tables/join with preferred_seat=99 returns 400 'Invalid seat number'."
+    },
+    "preferred_seat_auto_assign": {
+      "status": "PASS",
+      "detail": "POST /api/tables/join without preferred_seat auto-assigns first available seat (seat 0 on empty table)."
+    },
+    "full_6_6_table_spectator": {
+      "status": "PASS",
+      "detail": "Full 6/6 table with all 6 players at seats 0-5 confirmed. Spectator view shows all 6 players at their ACTUAL positions using SEAT_TO_ANGLE. No empty seat buttons shown. 6th player (HighRoller at seat 5, left side -135°) correctly visible - old bug with only 5 visible is fixed."
+    },
+    "spectator_click_specific_seat": {
+      "status": "PASS",
+      "detail": "Clicking take-seat-4 button calls handleTakeSeat(4) which sends preferred_seat=4 to backend. CardShark joined at seat 4 confirmed via API."
+    },
+    "spectator_to_player_transition": {
+      "status": "PASS",
+      "detail": "After clicking seat button, SPECTATING badge disappears and user transitions to player view. CardShark appears in the players list."
+    }
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_seat_selection_features.py",
+    "/app/test_reports/pytest/pytest_results_iter11.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "PokerTable.tsx opponents array (line 584) still uses old 5-slot approach for non-spectator view: opponents = SEAT_ANGLES.map((_, i) => opps[i] ?? null). This is correct and unchanged - SEAT_TO_ANGLE is only used for spectator view as specified.",
+    "handleTakeSeat properly passes preferredSeat as body.preferred_seat only when defined (line 529-531).",
+    "Empty seat filter logic: Array.from({length: gameState.max_players}, (_, s) => s).filter(s => !players.some(p => p.seat === s)) correctly shows only unoccupied seats.",
+    "The spectator hint 'Click a seat above to join' only shows when players.length < max_players - correct behavior."
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_seat_selection_features.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (10/10 tests pass)",
+    "frontend": "100% (11/11 features verified)"
+  },
+
+  "test_credentials": {
+    "player1": "AceKing / 1111",
+    "player2": "BluffMaster / 2222",
+    "player3": "CardShark / 3333",
+    "player4": "PokerPro / 4444",
+    "player5": "AllInAndy / 5555",
+    "player6": "HighRoller / 6666",
+    "admin": "TableAdmin / 0000"
+  },
+
+  "seed_data_creation": "Test tables ST5B7Z and PY3NT9 created during testing, both cleaned up after tests.",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "All features from iter 10 + iter 11 are working. Web app is at /app/web/src/ (NOT /app/frontend/). Auth uses data-testid='profile-{lowercase_username}' and data-testid='pin-btn-{n}'. Backend tests at /app/backend/tests/. Key selectors: data-testid='take-seat-{0-5}' for spectator empty seats, data-testid='table-btn-{table_id}' for lobby table buttons. SEAT_TO_ANGLE = {0:-90, 1:-45, 2:0, 3:90, 4:135, 5:-135}. Spectator view uses players.map() not opponent array.",
+
+  "rca_of_improvements": {
+    "full_table_fix": "Old code used 5-slot opponents array (SEAT_ANGLES.map((_, i) => opps[i])) which would miss the 6th player in spectator view. New code uses players.map() with SEAT_TO_ANGLE lookup, rendering ALL players at their actual seat positions.",
+    "preferred_seat_selection": "New JoinTableReq.preferred_seat Optional[int] field + validation logic (lines 847-852 in server.py): returns 400 for out-of-range seats or already-taken seats. Frontend handleTakeSeat(preferredSeat?) passes the seat number when available. Empty seat buttons use data-testid='take-seat-{s}' and call handleTakeSeat(s)."
+  }
+}

@@ -37,6 +37,8 @@ const ZONE_H = TABLE_H + PAD * 2;
 // ── Seat arrangement (angles around the oval) ─────────────────────────────────
 // My seat is always at the bottom (90°). Up to 5 opponent slots at other angles.
 const SEAT_ANGLES = [-90, -45, 0, 135, -135]; // top, upper-right, right, lower-left, left
+// Fixed seat-number → angle map used for spectator view (shows all 6 actual seat positions)
+const SEAT_TO_ANGLE: Record<number, number> = { 0: -90, 1: -45, 2: 0, 3: 90, 4: 135, 5: -135 };
 
 /** Position of a seat's CENTER in ZONE coordinates (oval edge). */
 function seatInZone(angleDeg: number) {
@@ -520,14 +522,16 @@ export default function PokerTable() {
     sendWs({ type: 'ready_next_hand' });
   }, [sendWs]);
 
-  const handleTakeSeat = useCallback(async () => {
+  const handleTakeSeat = useCallback(async (preferredSeat?: number) => {
     if (!token || takingSeat) return;
     setTakingSeat(true);
     try {
+      const body: Record<string, unknown> = { table_id: tableId };
+      if (preferredSeat !== undefined) body.preferred_seat = preferredSeat;
       const res = await fetch('/api/tables/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ table_id: tableId }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) console.error('Take seat failed');
       // State updates automatically via WS broadcast from backend
@@ -652,7 +656,10 @@ export default function PokerTable() {
         }}>←</button>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>{gameState ? '#' + gameState.hand_number : '—'}</div>
-          <div style={{ fontSize: 10, color: '#00f0ff', letterSpacing: 1 }}>{round.toUpperCase()}</div>
+          {isSpectator
+            ? <div style={{ fontSize: 9, color: '#00f0ff', letterSpacing: 2, background: '#00f0ff18', borderRadius: 6, padding: '2px 8px', fontWeight: 700 }}>👁 SPECTATING</div>
+            : <div style={{ fontSize: 10, color: '#00f0ff', letterSpacing: 1 }}>{round.toUpperCase()}</div>
+          }
           {timeLeft > 0 && <div style={{ fontSize: 10, color: '#f59e0b' }}>{timeLeft}s</div>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -735,7 +742,9 @@ export default function PokerTable() {
             const dealer = players.find(p => p.seat === gameState.dealer_seat);
             if (!dealer) return null;
             let angle: number;
-            if (dealer.user_id === user.id) {
+            if (isSpectator) {
+              angle = SEAT_TO_ANGLE[dealer.seat] ?? -90;
+            } else if (dealer.user_id === user.id) {
               angle = 90;
             } else {
               const oppIdx = opponents.findIndex(o => o?.user_id === dealer.user_id);
@@ -764,7 +773,9 @@ export default function PokerTable() {
           {/* ── Per-player bet chips on the felt ── */}
           {players.filter(p => p.bet_street > 0).map(p => {
             let angle: number;
-            if (p.user_id === user.id) {
+            if (isSpectator) {
+              angle = SEAT_TO_ANGLE[p.seat] ?? -90;
+            } else if (p.user_id === user.id) {
               angle = 90;
             } else {
               const oppIdx = opponents.findIndex(o => o?.user_id === p.user_id);
@@ -790,8 +801,8 @@ export default function PokerTable() {
             );
           })}
 
-          {/* ── Opponent Seats ── */}
-          {SEAT_ANGLES.map((angle, i) => {
+          {/* ── Opponent Seats (non-spectator view) ── */}
+          {!isSpectator && SEAT_ANGLES.map((angle, i) => {
             const opp = opponents[i];
             if (!opp) return (
               <div key={i} style={{
@@ -802,34 +813,13 @@ export default function PokerTable() {
                 width: SEAT_SIZE,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
               }}>
-                {isSpectator ? (
-                  <button
-                    onClick={handleTakeSeat}
-                    disabled={takingSeat}
-                    data-testid="take-seat-btn"
-                    style={{
-                      width: SEAT_SIZE, height: SEAT_SIZE, borderRadius: '50%',
-                      border: '2px dashed #00f0ff60',
-                      background: '#00f0ff0a',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: takingSeat ? 'wait' : 'pointer',
-                      flexDirection: 'column', gap: 2,
-                    }}
-                  >
-                    <span style={{ fontSize: 14 }}>+</span>
-                  </button>
-                ) : (
-                  <div style={{
-                    width: SEAT_SIZE, height: SEAT_SIZE, borderRadius: '50%',
-                    border: '2px dashed #1e293b',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <span style={{ fontSize: 16, color: '#1e293b' }}>+</span>
-                  </div>
-                )}
-                {isSpectator && (
-                  <span style={{ fontSize: 9, color: '#00f0ff60', fontWeight: 700 }}>TAKE SEAT</span>
-                )}
+                <div style={{
+                  width: SEAT_SIZE, height: SEAT_SIZE, borderRadius: '50%',
+                  border: '2px dashed #1e293b',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{ fontSize: 16, color: '#1e293b' }}>+</span>
+                </div>
               </div>
             );
             const isActive = opp.seat === gameState?.current_seat;
@@ -851,23 +841,8 @@ export default function PokerTable() {
             );
           })}
 
-          {/* ── My Seat (overlaps oval bottom halfway) ── */}
-          {myPlayer && (() => {
-            const pos = seatInZone(90); // center at oval bottom edge
-            return (
-              <div style={{
-                position: 'absolute',
-                left: pos.x - SEAT_SIZE / 2 - 4,
-                top: pos.y - SEAT_SIZE / 2 - 4, // half inside oval
-                zIndex: 10,
-              }}>
-                <PlayerSeat player={myPlayer} isMine={true} isActive={!!isMyTurn} timerProgress={isMyTurn ? timerProgress : undefined} timeLeft={isMyTurn ? timeLeft : undefined} />
-              </div>
-            );
-          })()}
-
-          {/* ── Spectator indicator at bottom seat ── */}
-          {isSpectator && (() => {
+          {/* ── My Seat (non-spectator only) ── */}
+          {!isSpectator && myPlayer && (() => {
             const pos = seatInZone(90);
             return (
               <div style={{
@@ -875,20 +850,70 @@ export default function PokerTable() {
                 left: pos.x - SEAT_SIZE / 2 - 4,
                 top: pos.y - SEAT_SIZE / 2 - 4,
                 zIndex: 10,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
               }}>
-                <div style={{
-                  width: SEAT_SIZE, height: SEAT_SIZE, borderRadius: '50%',
-                  border: '2px dashed #00f0ff50',
-                  background: '#00f0ff08',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <span style={{ fontSize: 18 }}>👁</span>
-                </div>
-                <span style={{ fontSize: 9, color: '#00f0ff80', fontWeight: 700, letterSpacing: 1 }}>SPECTATING</span>
+                <PlayerSeat player={myPlayer} isMine={true} isActive={!!isMyTurn} timerProgress={isMyTurn ? timerProgress : undefined} timeLeft={isMyTurn ? timeLeft : undefined} />
               </div>
             );
           })()}
+
+          {/* ── Spectator view: all players at their ACTUAL seat positions ── */}
+          {isSpectator && players.map(player => {
+            const angle = SEAT_TO_ANGLE[player.seat] ?? -90;
+            const pos = seatInZone(angle);
+            const isActive = player.seat === gameState?.current_seat;
+            return (
+              <div key={player.user_id} style={{
+                position: 'absolute',
+                left: pos.x - SEAT_SIZE / 2 - 4,
+                top: pos.y - SEAT_SIZE / 2 - 4,
+                zIndex: 10,
+              }}>
+                <PlayerSeat
+                  player={player} isMine={false} isActive={isActive}
+                  timerProgress={isActive ? timerProgress : undefined}
+                  timeLeft={isActive ? timeLeft : undefined}
+                  onKick={isAdmin ? () => kickPlayer(player.user_id) : undefined}
+                />
+              </div>
+            );
+          })}
+
+          {/* ── Spectator view: empty seats as labelled Take Seat buttons ── */}
+          {isSpectator && Array.from({ length: gameState?.max_players ?? 6 }, (_, s) => s)
+            .filter(s => !players.some(p => p.seat === s))
+            .map(s => {
+              const angle = SEAT_TO_ANGLE[s] ?? -90;
+              const pos = seatInZone(angle);
+              return (
+                <div key={`empty-${s}`} style={{
+                  position: 'absolute',
+                  left: pos.x - SEAT_SIZE / 2,
+                  top: pos.y - SEAT_SIZE / 2 - 4,
+                  zIndex: 10,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                }}>
+                  <button
+                    onClick={() => handleTakeSeat(s)}
+                    disabled={takingSeat}
+                    data-testid={`take-seat-${s}`}
+                    style={{
+                      width: SEAT_SIZE, height: SEAT_SIZE, borderRadius: '50%',
+                      border: '2px dashed #00f0ff60',
+                      background: takingSeat ? '#00f0ff04' : '#00f0ff0f',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: takingSeat ? 'wait' : 'pointer',
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    <span style={{ fontSize: 13, color: '#00f0ff90', fontWeight: 900 }}>+</span>
+                  </button>
+                  <span style={{ fontSize: 9, color: '#00f0ff70', fontWeight: 700, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
+                    SEAT {s + 1}
+                  </span>
+                </div>
+              );
+            })
+          }
         </div>
 
         {/* ── My Hole Cards (with drag-to-reorder and board labels) ── */}
@@ -970,29 +995,10 @@ export default function PokerTable() {
           </div>
         )}
 
-        {/* Spectator bottom bar */}
-        {isSpectator && (
-          <div style={{
-            textAlign: 'center', padding: '14px 16px',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-          }}>
-            <div style={{ fontSize: 10, color: '#00f0ff80', fontWeight: 700, letterSpacing: 2 }}>SPECTATOR MODE</div>
-            {(gameState?.max_players ?? 6) > players.length && (
-              <button
-                onClick={handleTakeSeat}
-                disabled={takingSeat}
-                data-testid="take-seat-bottom-btn"
-                style={{
-                  background: takingSeat ? '#1e293b' : '#00f0ff',
-                  border: 'none', borderRadius: 12,
-                  padding: '12px 28px', fontSize: 13, fontWeight: 900,
-                  color: takingSeat ? '#475569' : '#0a0f1a',
-                  cursor: takingSeat ? 'wait' : 'pointer',
-                }}
-              >
-                {takingSeat ? 'Taking seat...' : '+ Take a Seat'}
-              </button>
-            )}
+        {/* Spectator hint */}
+        {isSpectator && players.length < (gameState?.max_players ?? 6) && (
+          <div style={{ textAlign: 'center', padding: '6px 0', fontSize: 10, color: '#475569' }}>
+            Click a seat above to join
           </div>
         )}
       </div>
