@@ -460,13 +460,14 @@ export default function PokerTable() {
             onClick={toggleMute}
             data-testid="mute-toggle"
             style={{
-              background: muted ? '#ef444430' : '#131a2a',
-              border: `1px solid ${muted ? '#ef4444' : '#334155'}`,
-              borderRadius: 8,
-              padding: '6px 10px',
-              fontSize: 16,
+              background: muted ? '#ef444440' : '#131a2a',
+              border: `2px solid ${muted ? '#ef4444' : '#334155'}`,
+              borderRadius: 10,
+              padding: '8px 14px',
+              fontSize: 20,
               cursor: 'pointer',
-              color: muted ? '#ef4444' : '#64748b',
+              color: muted ? '#ef4444' : '#94a3b8',
+              transition: 'all 0.2s',
             }}
             title={muted ? 'Unmute sounds' : 'Mute sounds'}
           >
