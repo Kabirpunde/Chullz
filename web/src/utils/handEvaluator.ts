@@ -100,3 +100,49 @@ export function handPreview(holeCards: string[], communityCards: string[]): Hand
   if (all.length < 5) return null;
   return bestHand(all);
 }
+
+/** Omaha description: uses player's hole card high for flush / high-card labels. */
+function desc5Omaha(holeCards: string[], best5: string[]): string {
+  let vals = best5.map(rv).sort((a, b) => b - a);
+  const suits = best5.map(suit);
+  const isFlush = new Set(suits).size === 1;
+  const unique = [...new Set(vals)].sort((a, b) => a - b);
+  let isStraight = unique.length === 5 && unique[4] - unique[0] === 4;
+  const isWheel = new Set(vals).size === 5 && vals[0] === 14 && [2,3,4,5].every(v => vals.includes(v));
+  if (isWheel) { isStraight = true; vals = [5,4,3,2,1]; }
+  const cnt: Record<number,number> = {};
+  vals.forEach(v => { cnt[v] = (cnt[v] ?? 0) + 1; });
+  const groups = Object.entries(cnt).sort(([av,ac],[bv,bc]) => { const dc = +bc - +ac; return dc !== 0 ? dc : +bv - +av; });
+  const gv = groups.map(([v]) => parseInt(v));
+  const gc = groups.map(([,c]) => +c);
+  const rn = (v: number) => RANK_DISP[v] ?? String(v);
+  // For "high" labels use player's highest hole card
+  const holeHigh = rn(Math.max(...holeCards.map(rv)));
+  if (isStraight && isFlush) {
+    if (vals[0] === 14 && vals[1] === 13) return 'Royal Flush';
+    return `SF, ${holeHigh} high`;
+  }
+  if (gc[0] === 4) return `Quads, ${rn(gv[0])}s`;
+  if (gc[0] === 3 && gc[1] === 2) return `Full House, ${rn(gv[0])}/${rn(gv[1])}`;
+  if (isFlush) return `Flush, ${holeHigh} high`;
+  if (isStraight) return `Straight, ${rn(vals[0])} high`;
+  if (gc[0] === 3) return `Trips ${rn(gv[0])}s`;
+  if (gc[0] === 2 && gc[1] === 2) return `2-Pair ${rn(gv[0])} & ${rn(gv[1])}`;
+  if (gc[0] === 2) return `Pair of ${rn(gv[0])}s`;
+  return `Hi Card ${holeHigh}`;
+}
+
+/**
+ * Omaha evaluation: must use EXACTLY both hole cards + 3 community cards.
+ * Mirrors best_hand_omaha() in game_engine.py.
+ */
+export function bestHandOmaha(holeCards: string[], community: string[]): HandResult | null {
+  if (holeCards.length !== 2 || community.length < 3) return null;
+  let best: HandResult = { score: -1, description: '', best5: [] };
+  for (const commCombo of combinations(community, 3)) {
+    const hand = [...holeCards, ...commCombo];
+    const sc = eval5(hand);
+    if (sc > best.score) best = { score: sc, description: desc5Omaha(holeCards, hand), best5: hand };
+  }
+  return best.score >= 0 ? best : null;
+}

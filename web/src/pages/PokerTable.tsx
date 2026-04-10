@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import PlayingCard from '../components/PlayingCard';
 import ShowdownOverlay from '../components/ShowdownOverlay';
 import { useSoundEffects } from '../hooks/useSoundEffects';
+import { bestHandOmaha } from '../utils/handEvaluator';
 import type { Assignment } from '../components/AssignmentPanel';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -618,6 +619,20 @@ export default function PokerTable() {
   const showAutoActionWarning = !!isMyTurn && !isSpectator && timeLeft > 0 && timeLeft <= 5;
   const autoActionText = toCall > 0 ? `Auto-folding in ${timeLeft}s` : `Auto-checking in ${timeLeft}s`;
 
+  // Live hand strength per board — shown after flop, updates on every card reorder
+  const showHandStrength = !isSpectator && holeCards.length === 6
+    && ['flop', 'turn', 'river', 'assignment'].includes(round);
+  const boardStrengths = showHandStrength
+    ? [0, 1, 2].map(bi => {
+        const h1 = orderedHoleCards[bi * 2];
+        const h2 = orderedHoleCards[bi * 2 + 1];
+        const board = gameState?.boards?.[bi];
+        if (!board || !h1 || !h2) return null;
+        const community = [...board.flop, board.turn, board.river].filter(Boolean);
+        return bestHandOmaha([h1, h2], community);
+      })
+    : [null, null, null];
+
   // ── Render ────────────────────────────────────────────────────────────────
   if (!user) return null;
 
@@ -948,6 +963,36 @@ export default function PokerTable() {
                 );
               })}
             </div>
+
+            {/* Live hand strength badges — one per board, updates on every reorder */}
+            {showHandStrength && (
+              <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                {[0, 1, 2].map(bi => {
+                  const color = BOARD_COLORS[bi];
+                  const result = boardStrengths[bi];
+                  return (
+                    <div
+                      key={bi}
+                      data-testid={`board-strength-${bi}`}
+                      style={{
+                        flex: 1, textAlign: 'center', padding: '4px 5px',
+                        background: result ? color + '14' : '#1e293b30',
+                        border: `1px solid ${result ? color + '50' : '#1e293b'}`,
+                        borderRadius: 8, minWidth: 0, transition: 'background 0.2s',
+                      }}
+                    >
+                      <div style={{
+                        fontSize: 10, fontWeight: 700,
+                        color: result ? '#fff' : '#334155',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        {result ? result.description : '—'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {dragSrcIdx !== null && (
               <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Tap another card to swap board assignment</div>
             )}
