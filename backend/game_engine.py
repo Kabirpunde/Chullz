@@ -136,6 +136,72 @@ def best_hand(all_cards: List[str]) -> Tuple[int, str, List[str]]:
     return best_sc, best_dc, best_5
 
 
+def _desc5_omaha(hole_cards: List[str], best_5: List[str]) -> str:
+    """Hand description from the player's perspective.
+    For flush and high-card hands, the 'high' label uses the player's highest hole card
+    (since board cards are shared by all players, hole cards determine relative strength).
+    All other hand types (pair, two-pair, trips, straight, full house, quads) use standard labels.
+    """
+    vals = sorted([_rv(c) for c in best_5], reverse=True)
+    suits = [_suit(c) for c in best_5]
+    is_flush = len(set(suits)) == 1
+    unique = sorted(set(vals))
+    is_str8 = len(unique) == 5 and (unique[-1] - unique[0] == 4)
+    is_wheel = set(vals) == {14, 2, 3, 4, 5}
+    if is_wheel:
+        is_str8 = True
+        vals = [5, 4, 3, 2, 1]
+
+    cnt = Counter(vals)
+    groups = sorted(cnt.items(), key=lambda x: (x[1], x[0]), reverse=True)
+    gv = [g[0] for g in groups]
+    gc = [g[1] for g in groups]
+
+    def rn(v: int) -> str:
+        return RANK_DISP.get(v, str(v))
+
+    # For "high" descriptors: use the player's highest hole card
+    hole_vals_sorted = sorted([_rv(c) for c in hole_cards], reverse=True)
+    hole_high = rn(hole_vals_sorted[0])
+
+    if is_str8 and is_flush:
+        if set(vals) == {10, 11, 12, 13, 14}:
+            return "Royal Flush"
+        return f"Straight Flush, {hole_high} high"
+    if gc[0] == 4:
+        return f"Four of a Kind, {rn(gv[0])}s"
+    if gc[0] == 3 and gc[1] == 2:
+        return f"Full House, {rn(gv[0])}s full of {rn(gv[1])}s"
+    if is_flush:
+        return f"Flush, {hole_high} high"
+    if is_str8:
+        return f"Straight, {rn(vals[0])} high"
+    if gc[0] == 3:
+        return f"Three of a Kind, {rn(gv[0])}s"
+    if gc[0] == 2 and gc[1] == 2:
+        return f"Two Pair, {rn(gv[0])}s and {rn(gv[1])}s"
+    if gc[0] == 2:
+        return f"Pair of {rn(gv[0])}s"
+    return f"High Card {hole_high}"
+
+
+def best_hand_omaha(hole_cards: List[str], community: List[str]) -> Tuple[int, str, List[str]]:
+    """Omaha-style evaluation: must use exactly BOTH hole cards + exactly 3 community cards.
+    Returns (score, description, best_5_cards).
+    """
+    if len(hole_cards) != 2 or len(community) < 3:
+        return 0, "Incomplete", hole_cards + community
+    best_sc, best_dc, best_5 = -1, "", []
+    for comm_combo in combinations(community, 3):
+        hand = list(hole_cards) + list(comm_combo)  # exactly 5 cards
+        sc = _eval5(hand)
+        if sc > best_sc:
+            best_sc = sc
+            best_dc = _desc5_omaha(hole_cards, hand)
+            best_5 = hand
+    return best_sc, best_dc, best_5
+
+
 # ── Pot-Limit Betting ─────────────────────────────────────────────────────────
 def pl_max_raise_total(total_pot: int, current_bet: int, player_bet: int) -> int:
     """Maximum total chips a player can have bet (incl. their existing street bet)."""
@@ -210,9 +276,9 @@ def score_boards(
         for i, bk in enumerate(["board_1", "board_2", "board_3"]):
             hole = assign.get(bk, [])
             community = community_cards[i] if i < len(community_cards) else []
-            all_cards = hole + community
-            if len(all_cards) >= 5:
-                sc, desc, best5 = best_hand(all_cards)
+            # Omaha rules: must use exactly both hole cards + 3 community cards
+            if len(hole) == 2 and len(community) >= 3:
+                sc, desc, best5 = best_hand_omaha(hole, community)
             else:
                 sc, desc, best5 = 0, "Incomplete", []
             results[uid][bk] = {

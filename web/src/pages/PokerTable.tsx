@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import PlayingCard from '../components/PlayingCard';
-import AssignmentPanel from '../components/AssignmentPanel';
 import ShowdownOverlay from '../components/ShowdownOverlay';
 import { useSoundEffects } from '../hooks/useSoundEffects';
 import type { Assignment } from '../components/AssignmentPanel';
@@ -517,6 +516,17 @@ export default function PokerTable() {
     playSubmit();
   }, [sendWs, playSubmit]);
 
+  // Derives assignment from current hole card order and submits inline
+  const submitInlineAssignment = useCallback(() => {
+    if (holeCards.length !== 6 || holeCardOrder.length !== 6 || submitting) return;
+    const ordered = holeCardOrder.map(i => holeCards[i]);
+    handleSubmitAssignment({
+      board_1: [ordered[0], ordered[1]],
+      board_2: [ordered[2], ordered[3]],
+      board_3: [ordered[4], ordered[5]],
+    });
+  }, [holeCards, holeCardOrder, submitting, handleSubmitAssignment]);
+
   const handleReadyNextHand = useCallback(() => {
     setReadyVoted(true);
     sendWs({ type: 'ready_next_hand' });
@@ -610,37 +620,6 @@ export default function PokerTable() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (!user) return null;
-
-  if (round === 'assignment' && !isSpectator) {
-    return (
-      <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#060b14' }}>
-        {/* Mini header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          padding: '10px 16px', background: '#0a0f1a',
-          borderBottom: '1px solid #1e293b', flexShrink: 0,
-        }}>
-          <button onClick={() => navigate('/lobby')} style={{
-            background: 'none', border: 'none', color: '#64748b',
-            fontSize: 22, cursor: 'pointer', padding: '0 4px',
-          }}>←</button>
-          <span style={{ fontWeight: 900, color: '#fff', fontSize: 15 }}>ASSIGN CARDS</span>
-        </div>
-        <AssignmentPanel
-          holeCards={holeCards}
-          boards={gameState?.boards ?? []}
-          assignment={assignment}
-          onAssignmentChange={setAssignment}
-          onSubmit={handleSubmitAssignment}
-          timeLeft={timeLeft}
-          assignedUids={gameState?.assigned_uids ?? []}
-          myUserId={user.id}
-          players={players}
-          submitting={submitting}
-        />
-      </div>
-    );
-  }
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#060b14', overflow: 'hidden' }}>
@@ -971,6 +950,45 @@ export default function PokerTable() {
             </div>
             {dragSrcIdx !== null && (
               <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Tap another card to swap board assignment</div>
+            )}
+          </div>
+        )}
+
+        {/* ── INLINE ASSIGNMENT CONFIRM (shown on main table during assignment round) ── */}
+        {round === 'assignment' && !isSpectator && holeCards.length === 6 && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: 8, padding: '10px 16px', flexShrink: 0,
+          }}>
+            <div style={{ fontSize: 11, color: '#475569' }}>
+              Drag to reorder · Left pair → B1, middle → B2, right → B3
+              &nbsp;·&nbsp;
+              <span style={{ color: '#64748b' }}>
+                {gameState?.assigned_uids?.length ?? 0}/{players.filter(p => ['active','all_in'].includes(p.status)).length} confirmed
+              </span>
+            </div>
+            {(submitting || gameState?.assigned_uids?.includes(user.id)) ? (
+              <div style={{
+                background: '#131a2a', border: '1px solid #22c55e40',
+                borderRadius: 12, padding: '12px 28px',
+                fontSize: 13, fontWeight: 700, color: '#22c55e',
+                textAlign: 'center',
+              }}>
+                ✓ Confirmed — waiting for others…
+              </div>
+            ) : (
+              <button
+                onClick={submitInlineAssignment}
+                data-testid="confirm-assignment-btn"
+                style={{
+                  background: '#00f0ff', border: 'none', borderRadius: 12,
+                  padding: '14px', fontSize: 14, fontWeight: 900,
+                  color: '#0a0f1a', cursor: 'pointer',
+                  width: '100%', maxWidth: 320,
+                }}
+              >
+                ✓ Confirm Assignment
+              </button>
             )}
           </div>
         )}

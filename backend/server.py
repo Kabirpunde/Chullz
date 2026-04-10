@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from dataclasses import dataclass, field
 from game_engine import (
-    new_deck, deal, best_hand, valid_actions, score_boards, auto_assign, is_red,
+    new_deck, deal, best_hand, best_hand_omaha, valid_actions, score_boards, auto_assign, is_red,
     RANK_VAL, RANK_SHORT
 )
 
