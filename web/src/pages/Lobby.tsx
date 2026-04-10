@@ -70,12 +70,12 @@ export default function Lobby() {
       
       ws.onopen = () => {
         reconnectAttempts = 0;
-        // Start ping interval to keep connection alive
+        // Start ping interval to keep connection alive (every 15 seconds)
         pingInterval = setInterval(() => {
           if (ws?.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'ping' }));
           }
-        }, 25000);
+        }, 15000);
       };
       
       ws.onmessage = e => {
@@ -92,7 +92,7 @@ export default function Lobby() {
         // Auto-reconnect if not deliberate close
         if (event.code !== 1000 && reconnectAttempts < maxReconnects) {
           reconnectAttempts++;
-          const delay = Math.min(1000 * reconnectAttempts, 5000);
+          const delay = Math.min(500 * reconnectAttempts, 3000); // Faster reconnect
           reconnectTimeout = setTimeout(connect, delay);
         }
       };

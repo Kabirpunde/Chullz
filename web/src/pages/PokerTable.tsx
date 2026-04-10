@@ -215,6 +215,7 @@ export default function PokerTable() {
   const [showShowdown, setShowShowdown] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [wsStatus, setWsStatus] = useState<'connecting' | 'open' | 'closed'>('connecting');
+  const [showReconnecting, setShowReconnecting] = useState(false);
   
   // Table disbanded state
   const [tableDisbanded, setTableDisbanded] = useState(false);
@@ -241,6 +242,7 @@ export default function PokerTable() {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectAttemptsRef = useRef(0);
+  const showBannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxReconnectAttempts = 10;
 
   const connectWebSocket = useCallback(() => {
@@ -264,14 +266,21 @@ export default function PokerTable() {
 
     ws.onopen = () => {
       setWsStatus('open');
+      setShowReconnecting(false); // Hide banner on successful connection
       reconnectAttemptsRef.current = 0; // Reset attempts on successful connection
       
-      // Start ping interval to keep connection alive (every 25 seconds)
+      // Clear the show banner timeout if connection succeeded quickly
+      if (showBannerTimeoutRef.current) {
+        clearTimeout(showBannerTimeoutRef.current);
+        showBannerTimeoutRef.current = null;
+      }
+      
+      // Start ping interval to keep connection alive (every 15 seconds)
       pingIntervalRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'ping' }));
         }
-      }, 25000);
+      }, 15000);
     };
 
     ws.onclose = (event) => {
@@ -293,9 +302,16 @@ export default function PokerTable() {
       // Auto-reconnect if not a deliberate close (code 1000)
       if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
         reconnectAttemptsRef.current++;
-        const delay = Math.min(1000 * reconnectAttemptsRef.current, 5000); // Linear backoff, max 5s
+        const delay = Math.min(500 * reconnectAttemptsRef.current, 3000); // Faster reconnect: 500ms, 1s, 1.5s... max 3s
         console.log(`WebSocket closed (code ${event.code}), reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`);
         reconnectTimeoutRef.current = setTimeout(connectWebSocket, delay);
+        
+        // Only show banner after 2 seconds of being disconnected
+        if (!showBannerTimeoutRef.current) {
+          showBannerTimeoutRef.current = setTimeout(() => {
+            setShowReconnecting(true);
+          }, 2000);
+        }
       }
     };
 
@@ -365,6 +381,9 @@ export default function PokerTable() {
       }
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
+      }
+      if (showBannerTimeoutRef.current) {
+        clearTimeout(showBannerTimeoutRef.current);
       }
       ws?.close(1000); // Normal close, don't reconnect
     };
@@ -865,20 +884,13 @@ export default function PokerTable() {
         />
       )}
 
-      {/* WS status banner - hide when table is disbanded */}
-      {!tableDisbanded && wsStatus === 'closed' && (
+      {/* WS status banner - only show after 2s of disconnection */}
+      {!tableDisbanded && showReconnecting && wsStatus === 'closed' && (
         <div style={{
           position: 'fixed', bottom: 80, left: 0, right: 0,
           background: '#f59e0b', padding: '8px', textAlign: 'center',
           fontSize: 12, color: '#000', fontWeight: 700, zIndex: 100,
         }}>Reconnecting...</div>
-      )}
-      {!tableDisbanded && wsStatus === 'connecting' && (
-        <div style={{
-          position: 'fixed', bottom: 80, left: 0, right: 0,
-          background: '#3b82f6', padding: '8px', textAlign: 'center',
-          fontSize: 12, color: '#fff', fontWeight: 700, zIndex: 100,
-        }}>Connecting...</div>
       )}
 
       {/* ── SHOWDOWN OVERLAY ── */}
