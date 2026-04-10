@@ -76,14 +76,7 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 
 ## Remaining / Upcoming Tasks
 
-### P1 Remaining
-- None
-
-### P2 Tasks
-- All done (auto-action warning + kick player)
-
 ### P3 Future / Backlog
-- Spectator mode: seat assignment visualization (spectator choosing which specific seat)
 - Game history/stats tracking dashboard
 - AI bot player for solo practice  
 - Quick Match auto-matchmaking
