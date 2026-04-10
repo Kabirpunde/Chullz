@@ -59,21 +59,42 @@ function chipPos(angleDeg: number) {
 }
 
 // ── Small sub-components ──────────────────────────────────────────────────────
-function PlayerSeat({ player, isMine, isActive, timerProgress }: {
-  player: PublicPlayer; isMine: boolean; isActive: boolean; timerProgress?: number;
+function PlayerSeat({ player, isMine, isActive, timerProgress, timeLeft }: {
+  player: PublicPlayer; isMine: boolean; isActive: boolean; timerProgress?: number; timeLeft?: number;
 }) {
   const online = true; // seats are always shown as online during game
   const showTimer = isActive && timerProgress !== undefined && timerProgress > 0;
   const circumference = Math.PI * (SEAT_SIZE + 6); // circle circumference
   const strokeDashoffset = circumference * (1 - timerProgress);
-  const timerColor = timerProgress <= 0.33 ? '#ef4444' : timerProgress <= 0.67 ? '#f59e0b' : '#00f0ff';
+  const timerColor = timerProgress && timerProgress <= 0.33 ? '#ef4444' : timerProgress && timerProgress <= 0.67 ? '#f59e0b' : '#00f0ff';
   
   return (
     <div style={{
       width: SEAT_SIZE + 8, display: 'flex', flexDirection: 'column',
       alignItems: 'center', gap: 3,
       position: 'relative',
+      overflow: 'visible',
     }}>
+      {/* Timer seconds badge - above avatar */}
+      {showTimer && timeLeft !== undefined && timeLeft > 0 && (
+        <div style={{
+          position: 'absolute',
+          top: -24,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: timerColor,
+          color: timerColor === '#00f0ff' ? '#0a0f1a' : '#fff',
+          fontSize: 13,
+          fontWeight: 900,
+          padding: '4px 12px',
+          borderRadius: 12,
+          zIndex: 200,
+          whiteSpace: 'nowrap',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+        }}>
+          {timeLeft}s
+        </div>
+      )}
       {/* Timer circle SVG */}
       {showTimer && (
         <svg
@@ -562,6 +583,7 @@ export default function PokerTable() {
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>{gameState ? '#' + gameState.hand_number : '—'}</div>
           <div style={{ fontSize: 10, color: '#00f0ff', letterSpacing: 1 }}>{round.toUpperCase()}</div>
+          {timeLeft > 0 && <div style={{ fontSize: 10, color: '#f59e0b' }}>{timeLeft}s</div>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ textAlign: 'right' }}>
@@ -728,7 +750,7 @@ export default function PokerTable() {
                 top: pos.y - SEAT_SIZE / 2 - 4,
                 zIndex: 10,
               }}>
-                <PlayerSeat player={opp} isMine={false} isActive={isActive} timerProgress={isActive ? timerProgress : undefined} />
+                <PlayerSeat player={opp} isMine={false} isActive={isActive} timerProgress={isActive ? timerProgress : undefined} timeLeft={isActive ? timeLeft : undefined} />
               </div>
             );
           })}
@@ -743,7 +765,7 @@ export default function PokerTable() {
                 top: pos.y - SEAT_SIZE / 2 - 4, // half inside oval
                 zIndex: 10,
               }}>
-                <PlayerSeat player={myPlayer} isMine={true} isActive={!!isMyTurn} timerProgress={isMyTurn ? timerProgress : undefined} />
+                <PlayerSeat player={myPlayer} isMine={true} isActive={!!isMyTurn} timerProgress={isMyTurn ? timerProgress : undefined} timeLeft={isMyTurn ? timeLeft : undefined} />
               </div>
             );
           })()}
@@ -944,7 +966,7 @@ export default function PokerTable() {
                 Returning to lobby in
               </p>
               <p style={{ color: '#00f0ff', fontSize: 36, fontWeight: 900 }}>
-                {disbandCountdown}
+                {disbandCountdown}s
               </p>
             </div>
             <button

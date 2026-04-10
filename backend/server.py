@@ -680,12 +680,16 @@ async def _end_hand_last_player(room: GameRoom):
 # ── Timer coroutines ──────────────────────────────────────────────────────────
 async def _auto_fold(table_id: str, seat: int, hand_num: int):
     """Auto-action when player times out: check if possible, otherwise fold."""
+    import logging
+    logging.info(f"_auto_fold started for table {table_id}, seat {seat}, hand {hand_num}")
     await asyncio.sleep(30)
     room = game_rooms.get(table_id)
     if not room or room.hand_number != hand_num or room.current_seat != seat:
+        logging.info(f"_auto_fold cancelled - conditions not met: room={bool(room)}, hand_match={room.hand_number == hand_num if room else False}, seat_match={room.current_seat == seat if room else False}")
         return
     p = room.by_seat(seat)
     if not p or not room.hand:
+        logging.info(f"_auto_fold cancelled - player or hand missing")
         return
     
     # Check if player can check (no bet to call)
@@ -693,11 +697,15 @@ async def _auto_fold(table_id: str, seat: int, hand_num: int):
     current_bet = room.hand.current_bet
     to_call = current_bet - player_bet
     
+    logging.info(f"_auto_fold executing: player_bet={player_bet}, current_bet={current_bet}, to_call={to_call}")
+    
     if to_call == 0:
         # Player can check - auto-check instead of fold
+        logging.info(f"Auto-CHECK for {p.username}")
         await _apply_action(room, p.user_id, "check", 0)
     else:
         # Player must call or fold - auto-fold
+        logging.info(f"Auto-FOLD for {p.username}")
         await _apply_action(room, p.user_id, "fold", 0)
 
 
