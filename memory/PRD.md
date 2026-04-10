@@ -11,9 +11,8 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 
 ## Architecture
 - **Frontend:** React + Vite PWA (`/app/web/`) served via **Vite preview** on port 3000
-  - Supervisor runs `yarn start` → `expo start` → wrapper script at `/app/frontend/node_modules/.bin/expo`
-  - Wrapper: builds `/app/web` if no `dist/`, then starts `vite preview` (zero HMR, zero file watching)
-  - PWA manifest + service worker (installable on iOS/Android home screen)
+  - Supervisor runs `yarn start` → wrapper script that builds `/app/web` if no `dist/`, then starts `vite preview`
+  - Zero HMR, zero file watching — static `dist/` bundle
   - Max-width 480px centered, responsive with `dvh`/`vw` units
 - **Backend:** FastAPI + WebSockets (`/app/backend/server.py` + `game_engine.py`) on port 8001
 - **Database:** MongoDB (local) with 7 pre-seeded user accounts
@@ -27,13 +26,6 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 5. Scoring: 1 point per board won, most points wins pot
 6. Mobile-first web app (no app store needed)
 
-## Vite Preview Fix (2026-04-09)
-- **Problem:** Vite dev server was watching source files → file changes caused restart → game state lost
-- **Previous workaround (commit 1573d39):** Added `hmr: false` + `watch: { ignored: ['**/**'] }` to `vite.config.ts`
-- **Full fix:** Replaced expo binary at `/app/frontend/node_modules/.bin/expo` with wrapper script
-  (`/app/frontend/start-vite.sh`) that runs `vite build` + `vite preview` instead of the dev server
-- **Result:** Serves pre-built static `dist/` bundle — zero file watching, zero HMR, page never reloads
-
 ## User Credentials (Test Accounts)
 | Username | PIN | Role |
 |---|---|---|
@@ -45,36 +37,55 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 | HighRoller | 6666 | player |
 | TableAdmin | 0000 | admin |
 
-## What's Been Implemented (2026-04-09)
-- ✅ Profile selection with PIN authentication
-- ✅ Multiplayer lobby with online player tracking
-- ✅ Table creation and joining
-- ✅ Real-time WebSocket game updates
-- ✅ 3-board poker variant (Chullz rules)
-- ✅ Card assignment phase with drag-to-reorder
-- ✅ Pot-limit betting with preset buttons (Fold/Call/Raise)
-- ✅ Raise slider with amount selection
-- ✅ Turn timer countdown (30s for actions, 60s for assignments)
-- ✅ Showdown and scoring system with winner overlay
-- ✅ Mobile-first PWA design
+## What's Been Implemented
 
-## Fixed Issues (2026-04-09)
-- Fixed WebSocket message type mismatch ('your_turn' vs 'valid_actions')
-- Action buttons (Fold/Call/Raise) now display correctly when it's player's turn
-- Switched frontend from React Native Expo to Vite web app
-- Timer now shows as receding circle around active player's avatar
-- Added mute/unmute button at top right for sound control
-- Increased community board card sizes for better visibility
-- Disabled PWA auto-update to prevent mid-game page refreshes
-- Hole card ordering preserved - only resets when new cards are dealt
+### Phase 1 (initial build)
+- Profile selection with PIN authentication
+- Multiplayer lobby with online player tracking
+- Table creation and joining
+- Real-time WebSocket game updates
+- 3-board poker variant (Chullz rules)
+- Card assignment phase with drag-to-reorder
+- Pot-limit betting with preset buttons (Fold/Call/Raise)
+- Turn timer countdown (30s for actions, 60s for assignments)
+- Showdown and scoring system with winner overlay
+- Mobile-first PWA design
 
-## Tech Stack
-- **Frontend**: React + Vite + TypeScript (PWA)
-- **Backend**: FastAPI + WebSockets
-- **Database**: MongoDB
-- **Auth**: JWT with PIN-based login
+### Phase 2 (fixes & polish)
+- Fixed WebSocket message type mismatch
+- Timer changed to receding circle around active player
+- Sound mute/unmute toggle
+- Admin table delete with confirmation
+- Connection persistence (ping/pong keepalive, auto-reconnect)
+- Auto-fold/check when 30s timer expires
+- Return to Table button in lobby
+- PWA disabled to prevent mid-game refresh
+- Disbanded table modal with countdown
 
-## Next Action Items
-- Add sound effects toggle option
-- Implement spectator mode
-- Add game history/stats tracking
+### Phase 3 (P0/P1/P2 — 2026-05-xx)
+- **P0: Showdown overlay auto-closes** — changed close condition to `gs.round !== 'showdown'` (was `preflop || waiting`)
+- **P0: Timer resets to 30s per player** — `_start_timer` called BEFORE `_broadcast_state` in `_start_hand`, `_apply_action`, `_advance_round`
+- **P1: Spectator Mode** — Lobby shows "👁 View Table" navigating without joining; PokerTable detects spectators (`isSpectator = !!gameState && !myPlayer`); empty seats show "Take Seat" buttons; spectator indicator at bottom; "SPECTATING" badge; "Take Seat" calls `POST /api/tables/join` which now allows mid-game joins (sitting_out for current hand, active next hand)
+- **P2: Auto-action warning** — Banner when `timeLeft <= 5 && isMyTurn` shows "Auto-folding/checking in Xs"
+- **P2: Admin kick player** — `POST /api/tables/{table_id}/kick/{uid}` endpoint; ✕ button on each opponent seat for admin; WS close code 4003; kicked modal
+
+## Key Technical Notes
+- `holeCards` removed from `connectWebSocket` deps (was causing spurious WS reconnects); use `holeCardsRef` instead
+- `ready_next_hand` WS handler now checks only player connections (not spectators) for "all ready" check
+- `join_table` REST endpoint no longer blocks mid-game joins
+
+## Remaining / Upcoming Tasks
+
+### P1 Remaining
+- None
+
+### P2 Tasks
+- All done (auto-action warning + kick player)
+
+### P3 Future / Backlog
+- Spectator mode: seat assignment visualization (spectator choosing which specific seat)
+- Game history/stats tracking dashboard
+- AI bot player for solo practice  
+- Quick Match auto-matchmaking
+- Move game state from in-memory → MongoDB (production resilience)
+- "Kick Player" from lobby (not just from inside table)
