@@ -12,13 +12,14 @@ interface BoardState { board_id: number; flop: string[]; turn: string; river: st
 interface PublicPlayer {
   user_id: string; username: string; avatar: string; avatar_color: string;
   chips: number; status: string; bet_street: number; seat: number;
+  wants_sitout?: boolean;
 }
 interface GameState {
   round: string; players: PublicPlayer[]; boards: BoardState[];
   pot: number; current_bet: number; last_raise: number;
   current_seat: number; dealer_seat: number; sb_seat: number; bb_seat: number;
   hand_number: number; timer_ends: number; assigned_uids: string[];
-  blind_small: number; blind_big: number; max_players: number;
+  blind_small: number; blind_big: number; max_players: number; starting_chips: number;
   last_showdown: unknown; showdown_ready: string[];
 }
 
@@ -64,9 +65,9 @@ function chipPos(angleDeg: number) {
 }
 
 // ── Small sub-components ──────────────────────────────────────────────────────
-function PlayerSeat({ player, isMine, isActive, timerProgress, timeLeft, onKick, isDealer, isSB, isBB }: {
+function PlayerSeat({ player, isMine, isActive, timerProgress, timeLeft, onKick, isDealer, isSB, isBB, onAdminGive }: {
   player: PublicPlayer; isMine: boolean; isActive: boolean; timerProgress?: number; timeLeft?: number; onKick?: () => void;
-  isDealer?: boolean; isSB?: boolean; isBB?: boolean;
+  isDealer?: boolean; isSB?: boolean; isBB?: boolean; onAdminGive?: () => void;
 }) {
   const online = true; // seats are always shown as online during game
   const showTimer = isActive && timerProgress !== undefined && timerProgress > 0;
@@ -197,6 +198,22 @@ function PlayerSeat({ player, isMine, isActive, timerProgress, timeLeft, onKick,
           }}
         >✕</button>
       )}
+      {/* Admin give chips button */}
+      {onAdminGive && (
+        <button
+          onClick={e => { e.stopPropagation(); onAdminGive(); }}
+          data-testid={`give-chips-${player.user_id}`}
+          title={`Give chips to ${player.username}`}
+          style={{
+            position: 'absolute', top: -4, left: -4,
+            background: '#22c55e90', border: '1px solid #22c55e',
+            borderRadius: '50%', width: 18, height: 18,
+            fontSize: 9, fontWeight: 900, color: '#fff',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 20, lineHeight: 1,
+          }}
+        >+</button>
+      )}
     </div>
   );
 }
@@ -271,6 +288,15 @@ export default function PokerTable() {
   // Table disbanded state
   const [tableDisbanded, setTableDisbanded] = useState(false);
   const [disbandCountdown, setDisbandCountdown] = useState(10);
+
+  // Top-up / leave / sit-out state
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [topUpInput, setTopUpInput] = useState(0);
+  const [bankroll, setBankroll] = useState(0);
+  const [topUpLoading, setTopUpLoading] = useState(false);
+  // Admin give-chips at table
+  const [adminGiveTarget, setAdminGiveTarget] = useState<{ uid: string; name: string } | null>(null);
+  const [adminGiveInput, setAdminGiveInput] = useState(1000);
 
   // Hole card ordering for pre-assignment (drag-to-reorder)
   const [holeCardOrder, setHoleCardOrder] = useState<number[]>([]);
@@ -580,6 +606,62 @@ export default function PokerTable() {
     sendWs({ type: 'ready_next_hand' });
   }, [sendWs]);
 
+  // Fetch bankroll on mount and refresh helper
+  const refreshBankroll = useCallback(() => {
+    if (!token) return;
+    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => setBankroll(d.chips ?? 0)).catch(() => {});
+  }, [token]);
+
+  useEffect(() => { refreshBankroll(); }, [refreshBankroll]);
+
+  // Leave table
+  const handleLeaveTable = useCallback(async () => {
+    if (!token) return;
+    try {
+      await fetch(`/api/tables/${tableId}/leave`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {}
+    navigate('/lobby');
+  }, [token, tableId, navigate]);
+
+  // Toggle sit out
+  const handleToggleSitOut = useCallback(() => {
+    sendWs({ type: 'toggle_sitout' });
+  }, [sendWs]);
+
+  // Top up chips
+  const handleTopUp = useCallback(async (amount: number) => {
+    if (!token || amount <= 0) return;
+    setTopUpLoading(true);
+    try {
+      const res = await fetch(`/api/tables/${tableId}/topup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amount }),
+      });
+      if (res.ok) {
+        setShowTopUpModal(false);
+        refreshBankroll();
+      }
+    } catch {}
+    setTopUpLoading(false);
+  }, [token, tableId, refreshBankroll]);
+
+  // Admin give chips at table
+  const handleAdminGiveChips = useCallback(async () => {
+    if (!token || !adminGiveTarget || adminGiveInput <= 0) return;
+    try {
+      await fetch(`/api/tables/${tableId}/admin/give-chips/${adminGiveTarget.uid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amount: adminGiveInput }),
+      });
+      setAdminGiveTarget(null);
+    } catch {}
+  }, [token, tableId, adminGiveTarget, adminGiveInput]);
+
   const handleTakeSeat = useCallback(async (preferredSeat?: number) => {
     if (!token || takingSeat) return;
     setTakingSeat(true);
@@ -664,7 +746,12 @@ export default function PokerTable() {
   const BOARD_COLORS = ['#3b82f6', '#22c55e', '#f59e0b'];
   const BOARD_LABELS = ['B1', 'B1', 'B2', 'B2', 'B3', 'B3'];
   
-  // Timer progress (0-1) for circular timer around active player
+  // Top-up derived values
+  const maxStack = Math.max(...(players.map(p => p.chips).concat([gameState?.blind_big ?? 50])));
+  const maxAllowed = Math.max(maxStack, gameState?.starting_chips ?? 5000);
+  const canRebuy = !!myPlayer && !isSpectator && myPlayer.chips < maxAllowed && bankroll > 0;
+  // Compulsory top-up modal: shown when player hits 0 chips and hand isn't active
+  const needsTopUp = !!myPlayer && myPlayer.chips === 0 && round !== 'preflop' && round !== 'flop' && round !== 'turn' && round !== 'river' && round !== 'assignment';
   const timerDuration = round === 'showdown' ? 120 : round === 'assignment' ? 60 : 30;
   const timerProgress = timeLeft > 0 ? timeLeft / timerDuration : 0;
 
@@ -711,10 +798,6 @@ export default function PokerTable() {
           {timeLeft > 0 && <div style={{ fontSize: 10, color: '#f59e0b' }}>{timeLeft}s</div>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 12, color: '#ffb800', fontWeight: 700 }}>POT</div>
-            <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>{(gameState?.pot ?? 0).toLocaleString()}</div>
-          </div>
           {/* Mute button */}
           <button
             onClick={toggleMute}
@@ -782,6 +865,19 @@ export default function PokerTable() {
                   Waiting for players…
                 </div>
               )}
+              {/* Total pot on felt — shown during active hands */}
+              {round !== 'waiting' && (() => {
+                const total = (gameState?.pot ?? 0) + players.reduce((s, p) => s + p.bet_street, 0);
+                return total > 0 ? (
+                  <div style={{
+                    fontSize: 13, fontWeight: 900, color: '#ffb800',
+                    background: 'rgba(0,0,0,0.4)', borderRadius: 10,
+                    padding: '3px 12px', marginTop: 2, letterSpacing: 0.5,
+                  }}>
+                    🪙 {total.toLocaleString()}
+                  </div>
+                ) : null;
+              })()}
             </div>
           </div>
 
@@ -854,6 +950,7 @@ export default function PokerTable() {
                   isDealer={round !== 'waiting' && opp.seat === gameState?.dealer_seat}
                   isSB={round !== 'waiting' && opp.seat === gameState?.sb_seat}
                   isBB={round !== 'waiting' && opp.seat === gameState?.bb_seat}
+                  onAdminGive={isAdmin ? () => { setAdminGiveTarget({ uid: opp.user_id, name: opp.username }); setAdminGiveInput(1000); } : undefined}
                 />
               </div>
             );
@@ -898,6 +995,7 @@ export default function PokerTable() {
                   isDealer={round !== 'waiting' && player.seat === gameState?.dealer_seat}
                   isSB={round !== 'waiting' && player.seat === gameState?.sb_seat}
                   isBB={round !== 'waiting' && player.seat === gameState?.bb_seat}
+                  onAdminGive={isAdmin ? () => { setAdminGiveTarget({ uid: player.user_id, name: player.username }); setAdminGiveInput(1000); } : undefined}
                 />
               </div>
             );
@@ -1097,6 +1195,45 @@ export default function PokerTable() {
         )}
       </div>
 
+      {/* ── SIT OUT / LEAVE / REBUY row (above action bar) ── */}
+      {!isSpectator && myPlayer && (
+        <div style={{
+          display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
+          gap: 6, padding: '4px 14px', background: '#0a0f1a', flexShrink: 0,
+        }}>
+          {canRebuy && (
+            <button
+              onClick={() => { setTopUpInput(Math.min(maxAllowed - myPlayer.chips, bankroll)); setShowTopUpModal(true); }}
+              data-testid="rebuy-btn"
+              style={{
+                padding: '5px 11px', borderRadius: 8, fontSize: 10, fontWeight: 800,
+                background: '#22c55e18', border: '1px solid #22c55e60',
+                color: '#22c55e', cursor: 'pointer',
+              }}
+            >+ Rebuy</button>
+          )}
+          <button
+            onClick={handleToggleSitOut}
+            data-testid="sitout-btn"
+            style={{
+              padding: '5px 11px', borderRadius: 8, fontSize: 10, fontWeight: 800,
+              background: myPlayer.wants_sitout ? '#f59e0b18' : '#1e293b',
+              border: `1px solid ${myPlayer.wants_sitout ? '#f59e0b60' : '#334155'}`,
+              color: myPlayer.wants_sitout ? '#f59e0b' : '#64748b', cursor: 'pointer',
+            }}
+          >{myPlayer.wants_sitout ? '▶ Come Back' : '⏸ Sit Out'}</button>
+          <button
+            onClick={handleLeaveTable}
+            data-testid="leave-table-btn"
+            style={{
+              padding: '5px 11px', borderRadius: 8, fontSize: 10, fontWeight: 800,
+              background: '#1e293b', border: '1px solid #334155',
+              color: '#64748b', cursor: 'pointer',
+            }}
+          >⬅ Leave</button>
+        </div>
+      )}
+
       {/* ── AUTO-ACTION WARNING ── */}
       {showAutoActionWarning && (
         <div style={{
@@ -1267,6 +1404,133 @@ export default function PokerTable() {
             >
               Go to Lobby Now
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── TOP-UP MODAL (compulsory when chips = 0, optional rebuy) ── */}
+      {(showTopUpModal || needsTopUp) && myPlayer && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 600,
+        }}>
+          <div style={{
+            background: '#131a2a', borderRadius: 20, padding: '28px 28px 24px',
+            textAlign: 'center', border: `2px solid ${needsTopUp ? '#ef4444' : '#22c55e'}`,
+            maxWidth: 320, width: '90%',
+          }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>{needsTopUp ? '💸' : '🪙'}</div>
+            <h2 style={{ fontSize: 17, fontWeight: 900, color: '#fff', marginBottom: 6 }}>
+              {needsTopUp ? 'Out of Chips!' : 'Rebuy Chips'}
+            </h2>
+            <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
+              {needsTopUp ? 'Top up to keep playing, or leave the table.' : `Max stack at table: ${maxAllowed.toLocaleString()} 🪙`}
+            </p>
+            <div style={{ background: '#0a0f1a', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: '#475569', fontWeight: 700, marginBottom: 4 }}>YOUR BANKROLL</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: '#ffb800' }}>{bankroll.toLocaleString()} 🪙</div>
+            </div>
+            {bankroll > 0 ? (
+              <>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {[500, 1000, 2000, 5000].map(amt => {
+                    const cap = Math.min(amt, maxAllowed - myPlayer.chips, bankroll);
+                    if (cap <= 0) return null;
+                    return (
+                      <button key={amt} onClick={() => setTopUpInput(cap)} style={{
+                        padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800,
+                        background: topUpInput === cap ? '#22c55e' : '#1e293b',
+                        border: `1px solid ${topUpInput === cap ? '#22c55e' : '#334155'}`,
+                        color: topUpInput === cap ? '#0a0f1a' : '#94a3b8', cursor: 'pointer',
+                      }}>{cap >= 1000 ? `${(cap/1000).toFixed(cap%1000===0?0:1)}K` : cap}</button>
+                    );
+                  })}
+                </div>
+                <input
+                  type="number" value={topUpInput} min={1}
+                  max={Math.min(maxAllowed - myPlayer.chips, bankroll)}
+                  onChange={e => setTopUpInput(Math.max(1, Math.min(Math.min(maxAllowed - myPlayer.chips, bankroll), Number(e.target.value))))}
+                  style={{
+                    width: '100%', padding: '10px 12px', borderRadius: 10, marginBottom: 12,
+                    background: '#0a0f1a', border: '1px solid #334155', color: '#fff',
+                    fontSize: 16, fontWeight: 700, textAlign: 'center', boxSizing: 'border-box',
+                  }}
+                />
+                <button
+                  onClick={() => handleTopUp(topUpInput)}
+                  disabled={topUpLoading || topUpInput <= 0}
+                  data-testid="confirm-topup-btn"
+                  style={{
+                    width: '100%', padding: '13px', borderRadius: 12, marginBottom: 8,
+                    background: topUpLoading || topUpInput <= 0 ? '#1e293b' : '#22c55e',
+                    border: 'none', fontSize: 14, fontWeight: 900,
+                    color: topUpLoading || topUpInput <= 0 ? '#475569' : '#0a0f1a', cursor: 'pointer',
+                  }}
+                >{topUpLoading ? 'Topping up…' : `Top Up ${topUpInput.toLocaleString()} 🪙`}</button>
+              </>
+            ) : (
+              <p style={{ fontSize: 12, color: '#ef4444', marginBottom: 12 }}>No bankroll available. Ask admin for chips.</p>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {!needsTopUp && (
+                <button onClick={() => setShowTopUpModal(false)} style={{
+                  flex: 1, padding: '11px', borderRadius: 12, background: '#1e293b',
+                  border: '1px solid #334155', color: '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}>Cancel</button>
+              )}
+              <button onClick={handleLeaveTable} style={{
+                flex: 1, padding: '11px', borderRadius: 12, background: '#ef444420',
+                border: '1px solid #ef444460', color: '#ef4444', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}>Leave Table</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADMIN GIVE CHIPS MODAL ── */}
+      {adminGiveTarget && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 700,
+        }}>
+          <div style={{
+            background: '#131a2a', borderRadius: 20, padding: '24px',
+            border: '2px solid #22c55e', maxWidth: 300, width: '90%', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>💰</div>
+            <h2 style={{ fontSize: 15, fontWeight: 900, color: '#fff', marginBottom: 4 }}>
+              Give Chips to {adminGiveTarget.name}
+            </h2>
+            <p style={{ fontSize: 11, color: '#64748b', marginBottom: 14 }}>Adds to in-game stack + bankroll</p>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {[500, 1000, 2000, 5000].map(amt => (
+                <button key={amt} onClick={() => setAdminGiveInput(amt)} style={{
+                  padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800,
+                  background: adminGiveInput === amt ? '#22c55e' : '#1e293b',
+                  border: `1px solid ${adminGiveInput === amt ? '#22c55e' : '#334155'}`,
+                  color: adminGiveInput === amt ? '#0a0f1a' : '#94a3b8', cursor: 'pointer',
+                }}>{amt >= 1000 ? `${amt/1000}K` : amt}</button>
+              ))}
+            </div>
+            <input
+              type="number" value={adminGiveInput} min={1}
+              onChange={e => setAdminGiveInput(Math.max(1, Number(e.target.value)))}
+              style={{
+                width: '100%', padding: '10px', borderRadius: 10, marginBottom: 12,
+                background: '#0a0f1a', border: '1px solid #334155', color: '#fff',
+                fontSize: 16, fontWeight: 700, textAlign: 'center', boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setAdminGiveTarget(null)} style={{
+                flex: 1, padding: '11px', borderRadius: 12, background: '#1e293b',
+                border: '1px solid #334155', color: '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}>Cancel</button>
+              <button onClick={handleAdminGiveChips} data-testid="confirm-give-chips-btn" style={{
+                flex: 1, padding: '11px', borderRadius: 12, background: '#22c55e',
+                border: 'none', color: '#0a0f1a', fontSize: 13, fontWeight: 900, cursor: 'pointer',
+              }}>Give {adminGiveInput.toLocaleString()}</button>
+            </div>
           </div>
         </div>
       )}

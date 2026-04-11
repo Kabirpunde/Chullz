@@ -5,6 +5,7 @@ import SelectProfile from './pages/SelectProfile';
 import Lobby from './pages/Lobby';
 import PokerTable from './pages/PokerTable';
 import History from './pages/History';
+import AdminPanel from './pages/AdminPanel';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -27,6 +28,7 @@ function AppRoutes() {
       <Route path="/lobby" element={<ProtectedRoute><Lobby /></ProtectedRoute>} />
       <Route path="/table/:tableId" element={<ProtectedRoute><PokerTable /></ProtectedRoute>} />
       <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to={user ? '/lobby' : '/login'} replace />} />
     </Routes>
   );

@@ -187,10 +187,11 @@ class GPlayer:
     avatar_color: str
     seat: int
     chips: int
-    status: str = "waiting"       # waiting/active/folded/all_in
+    status: str = "waiting"       # waiting/active/folded/all_in/sitting_out
     bet_street: int = 0           # chips bet this betting round
     bet_total: int = 0            # total chips committed this hand
     has_acted: bool = False
+    wants_sitout: bool = False    # player voluntarily sitting out next hand(s)
 
 @dataclass
 class GBoard:
@@ -280,7 +281,8 @@ def _public_state(room: GameRoom) -> Dict:
                            "turn": b.turn, "river": b.river})
     players = [{"user_id": p.user_id, "username": p.username, "avatar": p.avatar,
                 "avatar_color": p.avatar_color, "seat": p.seat, "chips": p.chips,
-                "status": p.status, "bet_street": p.bet_street}
+                "status": p.status, "bet_street": p.bet_street,
+                "wants_sitout": p.wants_sitout}
                for p in room.players]
     return {
         "table_id": room.table_id, "name": room.name, "status": room.status,
@@ -294,7 +296,7 @@ def _public_state(room: GameRoom) -> Dict:
         "bb_seat": room.hand.bb_seat if room.hand else 0,
         "hand_number": room.hand_number,
         "blind_small": room.blind_small, "blind_big": room.blind_big,
-        "max_players": room.max_players,
+        "max_players": room.max_players, "starting_chips": room.starting_chips,
         "timer_ends": room.timer_ends,
         "assigned_uids": list(room.hand.assignments.keys()) if room.hand else [],
         "last_showdown": room.last_showdown,
@@ -376,16 +378,16 @@ async def _start_timer(room: GameRoom, secs: float, coro):
 async def _start_hand(room: GameRoom):
     """Deal cards and begin pre-flop betting."""
     room.hand_number += 1
-    active = [p for p in room.players if p.chips > 0]
+    active = [p for p in room.players if p.chips > 0 and not p.wants_sitout]
     if len(active) < 2:
         room.status = "waiting"
         room.round = "waiting"
         await _broadcast_state(room)
         return
 
-    # Reset player status
+    # Reset player status (respect voluntary sit-out)
     for p in room.players:
-        p.status = "active" if p.chips > 0 else "sitting_out"
+        p.status = "sitting_out" if (p.chips <= 0 or p.wants_sitout) else "active"
         p.bet_street = 0
         p.bet_total = 0
         p.has_acted = False
@@ -860,6 +862,12 @@ class DistributeChipsReq(BaseModel):
     target_username: str
     amount: int
 
+class TopUpReq(BaseModel):
+    amount: int
+
+class GiveChipsReq(BaseModel):
+    amount: int
+
 class LoginReq(BaseModel):
     username: str
     pin: str
@@ -969,8 +977,71 @@ async def join_table(req: JoinTableReq, cu: dict = Depends(get_current_user)):
     return {"table_id": req.table_id, "seat": seat}
 
 
-@api.get("/tables/{table_id}")
-async def get_table(table_id: str):
+@api.post("/tables/{table_id}/topup")
+async def topup_chips(table_id: str, req: TopUpReq, cu: dict = Depends(get_current_user)):
+    """Player tops up their in-game chips from their bankroll."""
+    room = game_rooms.get(table_id)
+    if not room:
+        raise HTTPException(404, "Table not found")
+    p = room.by_uid(cu["id"])
+    if not p:
+        raise HTTPException(400, "Not seated at this table")
+    if req.amount <= 0:
+        raise HTTPException(400, "Amount must be positive")
+    # Max top-up = largest stack at the table OR starting chips, whichever is greater
+    max_stack = max((q.chips for q in room.players), default=room.starting_chips)
+    max_allowed = max(max_stack, room.starting_chips)
+    headroom = max_allowed - p.chips
+    if headroom <= 0:
+        raise HTTPException(400, "Already at or above maximum stack")
+    amount = min(req.amount, headroom)
+    # Check bankroll
+    user = await db.users.find_one({"_id": ObjectId(cu["id"])})
+    if not user or user["chips"] < amount:
+        raise HTTPException(400, f"Insufficient bankroll (have {user['chips'] if user else 0}, need {amount})")
+    await db.users.update_one({"_id": ObjectId(cu["id"])}, {"$inc": {"chips": -amount}})
+    p.chips += amount
+    await _save_table(room)
+    await _broadcast_state(room)
+    return {"success": True, "chips_added": amount, "new_chips": p.chips,
+            "new_bankroll": user["chips"] - amount}
+
+
+@api.post("/tables/{table_id}/admin/give-chips/{uid}")
+async def admin_give_chips_at_table(table_id: str, uid: str, req: GiveChipsReq, cu: dict = Depends(get_current_user)):
+    """Admin gives chips directly to a player's in-game stack and bankroll."""
+    if cu.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+    if req.amount <= 0:
+        raise HTTPException(400, "Amount must be positive")
+    room = game_rooms.get(table_id)
+    if not room:
+        raise HTTPException(404, "Table not found")
+    p = room.by_uid(uid)
+    if not p:
+        raise HTTPException(404, "Player not at this table")
+    # Add to in-game chips and bankroll
+    p.chips += req.amount
+    await db.users.update_one({"_id": ObjectId(uid)}, {"$inc": {"chips": req.amount}})
+    await _save_table(room)
+    await _broadcast_state(room)
+    user = await db.users.find_one({"_id": ObjectId(uid)}, {"pin_hash": 0})
+    return {"success": True, "chips_added": req.amount, "new_chips": p.chips,
+            "new_bankroll": user["chips"] if user else 0}
+
+
+@api.post("/admin/players/{uid}/give-chips")
+async def admin_give_bankroll_chips(uid: str, req: GiveChipsReq, cu: dict = Depends(get_current_user)):
+    """Admin adds chips directly to a player's bankroll (global)."""
+    if cu.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+    if req.amount <= 0:
+        raise HTTPException(400, "Amount must be positive")
+    result = await db.users.update_one({"_id": ObjectId(uid)}, {"$inc": {"chips": req.amount}})
+    if not result.matched_count:
+        raise HTTPException(404, "Player not found")
+    user = await db.users.find_one({"_id": ObjectId(uid)}, {"pin_hash": 0})
+    return {"success": True, "chips_added": req.amount, "new_bankroll": user["chips"]}
     room = game_rooms.get(table_id)
     if not room:
         raise HTTPException(404, "Table not found")
@@ -983,10 +1054,13 @@ async def leave_table(table_id: str, cu: dict = Depends(get_current_user)):
     if not room:
         raise HTTPException(404, "Table not found")
     room.players = [p for p in room.players if p.user_id != cu["id"]]
+    # Disconnect the leaving player's WS
+    room.connections.pop(cu["id"], None)
     if not room.players:
         del game_rooms[table_id]
         await db.game_tables.delete_one({"_id": table_id})
     else:
+        await _broadcast_state(room)
         await _save_table(room)
     return {"success": True}
 
@@ -1165,6 +1239,12 @@ async def game_ws(ws: WebSocket, table_id: str, user_id: str):
                             room.timer_task.cancel()
                         await _start_timer(room, 5, _next_hand_auto(room.table_id, room.hand_number, 5))
                         await _broadcast_state(room)
+
+            elif mtype == "toggle_sitout":
+                p = room.by_uid(user_id)
+                if p:
+                    p.wants_sitout = not p.wants_sitout
+                    await _broadcast_state(room)
 
             elif mtype == "ping":
                 await _send(room, user_id, {"type": "pong"})

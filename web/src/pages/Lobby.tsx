@@ -219,6 +219,20 @@ export default function Lobby() {
           >
             Stats
           </button>
+          {isAdmin && (
+            <button
+              onClick={() => navigate('/admin')}
+              data-testid="admin-panel-btn"
+              style={{
+                background: '#7c3aed20', border: '1px solid #7c3aed50',
+                borderRadius: 10, padding: '8px 16px',
+                fontSize: 12, fontWeight: 700, color: '#a78bfa',
+                cursor: 'pointer', letterSpacing: 0.5,
+              }}
+            >
+              Admin
+            </button>
+          )}
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{user.username}</div>
             <div style={{ fontSize: 12, color: '#ffb800', fontWeight: 600 }}>🪙 {user.chips.toLocaleString()}</div>
