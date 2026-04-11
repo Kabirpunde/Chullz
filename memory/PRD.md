@@ -86,7 +86,12 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 ### Phase 5 (Live Preview — 2026-05-xx)
 - **Live Hand Strength Badges** — `bestHandOmaha()` in `handEvaluator.ts`; 3 reactive badges under hole cards during flop/turn/river/assignment; Omaha shorthand; hole-card-relative high labels
 
-### Phase 6 Bug Fixes (2026-02)
+### Phase 7 (2026-02)
+- **SB/BB/D inline badges** — Small colored pills below player chips (D=gray, SB=amber, BB=cyan); standalone overlapping D button removed
+- **Effective stack betting** — `valid_actions` gains `opp_max` param; raise/all-in capped at max any non-folded opponent can commit; prevents dead-money bets and refunds
+- **History page card graphics** — Board community cards and per-player assigned hole cards now shown as `PlayingCard` graphics; backend saves `hole_cards_revealed` + `assignments` to hand_history
+- **Clockwise seat layout** — `SEAT_ANGLES` reordered clockwise; `opponents` array built from `(mySeat+1+i)%maxP` for correct spatial consistency
+- **Assignment/vote reconnect fix** — `pendingAssignmentRef` + `pendingVoteRef` for auto-re-send; server-truth sync in game_state handler
 - **Turn order visual fix** — `SEAT_ANGLES` reordered to clockwise from bottom `[135, -135, -90, -45, 0]`; opponents array now built by `(mySeat+1+i)%maxP` so turn indicator travels clockwise and all players share a consistent spatial layout
 - **Assignment stuck at 2/3** — `pendingAssignmentRef` in PokerTable.tsx: game_state handler now syncs `submitting` with server truth on every WS message; auto-re-sends pending assignment after reconnect
 - **Vote stuck at 2/3** — `pendingVoteRef` in PokerTable.tsx: game_state handler now syncs `readyVoted` with server truth on every WS message; auto-re-sends pending vote after reconnect
