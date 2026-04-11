@@ -1144,11 +1144,10 @@ async def game_ws(ws: WebSocket, table_id: str, user_id: str):
                 if room.round == "showdown":
                     room.showdown_ready.add(user_id)
                     await _broadcast_state(room)
-                    # If all connected players have voted, start next hand in 5s
-                    # Only count actual players (not spectators) for ready check
-                    player_uids = {p.user_id for p in room.players}
-                    connected_player_uids = set(room.connections.keys()) & player_uids
-                    if connected_player_uids and connected_player_uids.issubset(room.showdown_ready):
+                    # Only count players who participated in this hand (not sitting_out)
+                    participated_uids = {p.user_id for p in room.players if p.status != 'sitting_out'}
+                    connected_participated_uids = set(room.connections.keys()) & participated_uids
+                    if connected_participated_uids and connected_participated_uids.issubset(room.showdown_ready):
                         if room.timer_task and not room.timer_task.done():
                             room.timer_task.cancel()
                         await _start_timer(room, 5, _next_hand_auto(room.table_id, room.hand_number, 5))

@@ -5,7 +5,7 @@ import PlayingCard from '../components/PlayingCard';
 import ShowdownOverlay from '../components/ShowdownOverlay';
 import { useSoundEffects } from '../hooks/useSoundEffects';
 import { bestHandOmaha } from '../utils/handEvaluator';
-import type { Assignment } from '../components/AssignmentPanel';
+type Assignment = { board_1: string[]; board_2: string[]; board_3: string[] };
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface BoardState { board_id: number; flop: string[]; turn: string; river: string; }
@@ -274,6 +274,8 @@ export default function PokerTable() {
   const prevRoundRef = useRef('');
   const prevTimeRef = useRef(0);
   const holeCardsRef = useRef<string[]>([]); // stable ref for WS closure comparison
+  const pendingAssignmentRef = useRef<Assignment | null>(null); // reconnect recovery
+  const pendingVoteRef = useRef(false); // reconnect recovery
 
   // ── WebSocket ──────────────────────────────────────────────────────────────
   const sendWs = useCallback((msg: unknown) => {
@@ -380,16 +382,47 @@ export default function PokerTable() {
           case 'game_state': {
             const gs = msg.data as GameState;
             setGameState(gs);
+            const myId = user?.id ?? '';
+
             if (gs.round !== 'assignment') {
               setAssignment({ board_1: [], board_2: [], board_3: [] });
               setSubmitting(false);
+              pendingAssignmentRef.current = null;
+            } else {
+              // SERVER-TRUTH SYNC: if server doesn't have our assignment, allow re-submit
+              if (myId && !gs.assigned_uids?.includes(myId)) {
+                if (pendingAssignmentRef.current) {
+                  // Auto-re-send the pending assignment (reconnect recovery)
+                  ws.send(JSON.stringify({ type: 'assign_cards', data: pendingAssignmentRef.current }));
+                } else {
+                  setSubmitting(false);
+                }
+              } else if (myId && gs.assigned_uids?.includes(myId)) {
+                pendingAssignmentRef.current = null; // Server confirmed, clear pending
+              }
             }
-            if (gs.round === 'showdown') setValidActions(null);
+
+            if (gs.round === 'showdown') {
+              setValidActions(null);
+              // SERVER-TRUTH SYNC: if server doesn't have our vote, allow re-vote
+              if (myId && gs.showdown_ready && !gs.showdown_ready.includes(myId)) {
+                if (pendingVoteRef.current) {
+                  // Auto-re-send the vote (reconnect recovery)
+                  ws.send(JSON.stringify({ type: 'ready_next_hand' }));
+                } else {
+                  setReadyVoted(false);
+                }
+              } else if (myId && gs.showdown_ready?.includes(myId)) {
+                pendingVoteRef.current = false; // Server confirmed, clear pending
+              }
+            }
+
             // Close overlay and reset vote when any non-showdown round starts
             if (gs.round !== 'showdown') {
               setShowShowdown(false);
               setShowdownData(null);
               setReadyVoted(false);
+              pendingVoteRef.current = false;
             }
             break;
           }
@@ -513,6 +546,7 @@ export default function PokerTable() {
 
   const handleSubmitAssignment = useCallback((a: Assignment) => {
     setSubmitting(true);
+    pendingAssignmentRef.current = a; // Track for reconnect recovery
     sendWs({ type: 'assign_cards', data: a });
     playSubmit();
   }, [sendWs, playSubmit]);
@@ -530,6 +564,7 @@ export default function PokerTable() {
 
   const handleReadyNextHand = useCallback(() => {
     setReadyVoted(true);
+    pendingVoteRef.current = true; // Track for reconnect recovery
     sendWs({ type: 'ready_next_hand' });
   }, [sendWs]);
 
@@ -1151,7 +1186,7 @@ export default function PokerTable() {
         myUserId={user.id}
         timerEnds={gameState?.timer_ends ?? 0}
         showdownReady={gameState?.showdown_ready ?? []}
-        totalPlayers={players.length}
+        totalPlayers={players.filter(p => p.status !== 'sitting_out').length}
         alreadyVoted={readyVoted || isSpectator}
         onReadyNextHand={handleReadyNextHand}
         onClose={() => setShowShowdown(false)}
