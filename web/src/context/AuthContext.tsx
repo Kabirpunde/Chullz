@@ -14,6 +14,7 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (username: string, pin: string) => Promise<void>;
+  loginQuick: (username: string) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
 }
@@ -57,6 +58,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   }
 
+  async function loginQuick(username: string) {
+    const res = await fetch('/api/auth/login-quick', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username }),
+    });
+    if (!res.ok) throw new Error('Login failed');
+    const data = await res.json();
+    localStorage.setItem('chullz_token', data.token);
+    localStorage.setItem('chullz_user', JSON.stringify(data.user));
+    setToken(data.token);
+    setUser(data.user);
+  }
+
   function logout() {
     localStorage.removeItem('chullz_token');
     localStorage.removeItem('chullz_user');
@@ -70,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, loginQuick, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

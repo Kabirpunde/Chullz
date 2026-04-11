@@ -56,7 +56,7 @@ export default function AdminPanel() {
   };
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#060b14', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100dvh', background: '#060b14', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header */}
       <header style={{
         background: '#0a0f1a', borderBottom: '1px solid #1e293b',

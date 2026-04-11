@@ -872,12 +872,27 @@ class LoginReq(BaseModel):
     username: str
     pin: str
 
+class QuickLoginReq(BaseModel):
+    username: str
+
 
 @api.post("/auth/login")
 async def login(req: LoginReq):
     user = await db.users.find_one({"username": req.username})
     if not user or not verify_pin(req.pin, user["pin_hash"]):
         raise HTTPException(401, "Invalid username or PIN")
+    uid = str(user["_id"])
+    return {"token": create_token(uid, user["username"], user["role"]),
+            "user": {"id": uid, "username": user["username"], "avatar": user["avatar"],
+                     "avatar_color": user["avatar_color"], "role": user["role"], "chips": user["chips"]}}
+
+
+@api.post("/auth/login-quick")
+async def login_quick(req: QuickLoginReq):
+    """PIN-free login — click-to-enter for casual play."""
+    user = await db.users.find_one({"username": req.username})
+    if not user:
+        raise HTTPException(404, "User not found")
     uid = str(user["_id"])
     return {"token": create_token(uid, user["username"], user["role"]),
             "user": {"id": uid, "username": user["username"], "avatar": user["avatar"],
