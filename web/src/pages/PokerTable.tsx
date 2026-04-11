@@ -64,8 +64,9 @@ function chipPos(angleDeg: number) {
 }
 
 // ── Small sub-components ──────────────────────────────────────────────────────
-function PlayerSeat({ player, isMine, isActive, timerProgress, timeLeft, onKick }: {
+function PlayerSeat({ player, isMine, isActive, timerProgress, timeLeft, onKick, isDealer, isSB, isBB }: {
   player: PublicPlayer; isMine: boolean; isActive: boolean; timerProgress?: number; timeLeft?: number; onKick?: () => void;
+  isDealer?: boolean; isSB?: boolean; isBB?: boolean;
 }) {
   const online = true; // seats are always shown as online during game
   const showTimer = isActive && timerProgress !== undefined && timerProgress > 0;
@@ -172,6 +173,14 @@ function PlayerSeat({ player, isMine, isActive, timerProgress, timeLeft, onKick 
           {player.chips.toLocaleString()}
         </span>
       </div>
+      {/* D / SB / BB role tokens */}
+      {(isDealer || isSB || isBB) && (
+        <div style={{ display: 'flex', gap: 2, marginTop: 1 }}>
+          {isDealer && <div style={{ background: '#e2e8f0', color: '#0a0f1a', fontSize: 7, fontWeight: 900, padding: '1px 5px', borderRadius: 4, border: '1px solid #94a3b8' }}>D</div>}
+          {isSB && <div style={{ background: '#f59e0b', color: '#0a0f1a', fontSize: 7, fontWeight: 900, padding: '1px 5px', borderRadius: 4 }}>SB</div>}
+          {isBB && <div style={{ background: '#00f0ff', color: '#0a0f1a', fontSize: 7, fontWeight: 900, padding: '1px 5px', borderRadius: 4 }}>BB</div>}
+        </div>
+      )}
       {/* Admin kick button */}
       {onKick && (
         <button
@@ -776,39 +785,6 @@ export default function PokerTable() {
             </div>
           </div>
 
-          {/* ── Dealer Button "D" ── */}
-          {round !== 'waiting' && gameState?.dealer_seat !== undefined && (() => {
-            const dealer = players.find(p => p.seat === gameState.dealer_seat);
-            if (!dealer) return null;
-            let angle: number;
-            if (isSpectator) {
-              angle = SEAT_TO_ANGLE[dealer.seat] ?? -90;
-            } else if (dealer.user_id === user.id) {
-              angle = 90;
-            } else {
-              const oppIdx = opponents.findIndex(o => o?.user_id === dealer.user_id);
-              if (oppIdx < 0) return null;
-              angle = SEAT_ANGLES[oppIdx];
-            }
-            const sp = seatInZone(angle);
-            const cx = PAD + TABLE_W / 2;
-            const cy = PAD + TABLE_H / 2;
-            const bx = sp.x + (cx - sp.x) * 0.25;
-            const by = sp.y + (cy - sp.y) * 0.25;
-            return (
-              <div style={{
-                position: 'absolute', left: bx - 11, top: by - 11,
-                width: 22, height: 22, borderRadius: '50%',
-                background: '#fff', border: '2px solid #0f3d22',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                zIndex: 16, boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
-                pointerEvents: 'none',
-              }}>
-                <span style={{ fontSize: 10, fontWeight: 900, color: '#0a0f1a' }}>D</span>
-              </div>
-            );
-          })()}
-
           {/* ── Per-player bet chips on the felt ── */}
           {players.filter(p => p.bet_street > 0).map(p => {
             let angle: number;
@@ -875,6 +851,9 @@ export default function PokerTable() {
                   timerProgress={isActive ? timerProgress : undefined}
                   timeLeft={isActive ? timeLeft : undefined}
                   onKick={isAdmin ? () => kickPlayer(opp.user_id) : undefined}
+                  isDealer={round !== 'waiting' && opp.seat === gameState?.dealer_seat}
+                  isSB={round !== 'waiting' && opp.seat === gameState?.sb_seat}
+                  isBB={round !== 'waiting' && opp.seat === gameState?.bb_seat}
                 />
               </div>
             );
@@ -890,7 +869,11 @@ export default function PokerTable() {
                 top: pos.y - SEAT_SIZE / 2 - 4,
                 zIndex: 10,
               }}>
-                <PlayerSeat player={myPlayer} isMine={true} isActive={!!isMyTurn} timerProgress={isMyTurn ? timerProgress : undefined} timeLeft={isMyTurn ? timeLeft : undefined} />
+                <PlayerSeat player={myPlayer} isMine={true} isActive={!!isMyTurn} timerProgress={isMyTurn ? timerProgress : undefined} timeLeft={isMyTurn ? timeLeft : undefined}
+                  isDealer={round !== 'waiting' && myPlayer.seat === gameState?.dealer_seat}
+                  isSB={round !== 'waiting' && myPlayer.seat === gameState?.sb_seat}
+                  isBB={round !== 'waiting' && myPlayer.seat === gameState?.bb_seat}
+                />
               </div>
             );
           })()}
@@ -912,6 +895,9 @@ export default function PokerTable() {
                   timerProgress={isActive ? timerProgress : undefined}
                   timeLeft={isActive ? timeLeft : undefined}
                   onKick={isAdmin ? () => kickPlayer(player.user_id) : undefined}
+                  isDealer={round !== 'waiting' && player.seat === gameState?.dealer_seat}
+                  isSB={round !== 'waiting' && player.seat === gameState?.sb_seat}
+                  isBB={round !== 'waiting' && player.seat === gameState?.bb_seat}
                 />
               </div>
             );

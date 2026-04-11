@@ -217,8 +217,11 @@ def valid_actions(
     last_raise_size: int,
     blind_big: int,
     total_pot: int,
+    opp_max: Optional[int] = None,  # effective stack cap: max any opponent can commit this street
 ) -> Dict[str, Any]:
-    """Return all valid actions and their amounts."""
+    """Return all valid actions and their amounts.
+    opp_max: if provided, caps raises so the player cannot bet more than any opponent can call.
+    """
     to_call = current_bet - player_bet
     acts: Dict[str, Any] = {"fold": True}
 
@@ -236,26 +239,36 @@ def valid_actions(
     if can_raise:
         actual_min = min(min_total, player_bet + player_chips)
         actual_max = min(max_total, player_bet + player_chips)
+        # Cap at effective stack: no point betting more than opponents can call
+        if opp_max is not None:
+            actual_max = min(actual_max, opp_max)
 
-        def pct(p: float) -> int:
-            raw = player_bet + to_call + int(total_pot * p)
-            return max(min(actual_max, raw), actual_min)
+        if actual_max >= actual_min:
+            def pct(p: float) -> int:
+                raw = player_bet + to_call + int(total_pot * p)
+                return max(min(actual_max, raw), actual_min)
 
-        acts["raise"] = {
-            "min": actual_min,
-            "max": actual_max,
-            "buttons": {
-                "25%":  pct(0.25),
-                "33%":  pct(0.33),
-                "50%":  pct(0.50),
-                "66%":  pct(0.66),
-                "75%":  pct(0.75),
-                "100%": actual_max,
-            },
-        }
+            acts["raise"] = {
+                "min": actual_min,
+                "max": actual_max,
+                "buttons": {
+                    "25%":  pct(0.25),
+                    "33%":  pct(0.33),
+                    "50%":  pct(0.50),
+                    "66%":  pct(0.66),
+                    "75%":  pct(0.75),
+                    "100%": actual_max,
+                },
+            }
 
     if player_chips > 0:
-        acts["all_in"] = player_bet + player_chips  # total after going all-in
+        all_in_total = player_bet + player_chips
+        if opp_max is not None:
+            all_in_total = min(all_in_total, opp_max)
+        # Only show ALL IN if it commits more than a regular call
+        call_total = player_bet + min(to_call, player_chips)
+        if all_in_total > call_total:
+            acts["all_in"] = all_in_total
 
     return acts
 

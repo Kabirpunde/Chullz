@@ -1,0 +1,66 @@
+{
+  "summary": "Iteration 17: Tested 5 new features: (1) SB/BB/D inline badges on PlayerSeat avatars, (2) no standalone floating D button, (3) History page PlayingCard graphics for community+hole cards, (4) effective-stack betting cap (raise/all-in capped at opp_max), (5) mid-game joiner (sitting_out) excluded from assignment denominator and ready_next_hand quorum. All 14 backend tests pass (100%). All 9 frontend features verified via browser automation and screenshots.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "feature_verification": {
+    "sb_bb_d_badges": "PASS: D badge (gray #e2e8f0), SB badge (amber #f59e0b), BB badge (cyan #00f0ff) all visible as inline pills below player chips during PREFLOP. Verified via JS DOM query: [{text:BB, bg:rgb(0,240,255)}, {text:D, bg:rgb(226,232,240)}, {text:SB, bg:rgb(245,158,11)}]. Heads-up: AceKing has D+SB, BluffMaster has BB.",
+    "no_standalone_d_button": "PASS: No standalone floating D button found. Badge row is rendered inline inside PlayerSeat component using small pill divs below chips. Code review confirmed: standalone D button block removed, isDealer/isSB/isBB props passed to all 3 PlayerSeat usages.",
+    "history_community_cards_playingcard": "PASS: BOARD 1/2/3 labels visible in expanded hand. Community cards rendered as PlayingCard components showing rank+suit (e.g., 10♥, K♣, A♦). Suit symbols (♥♣♦♠) verified in page text.",
+    "history_hole_cards_playingcard": "PASS: Each player's assigned hole cards per board shown as PlayingCard graphics (e.g., AceKing: Q♦,10♠ on Board 1; BluffMaster: J♥,2♣). assignments field stored and rendered correctly.",
+    "raise_max_capped_unit": "PASS: 6 unit tests for game_engine.valid_actions with opp_max: raise max capped at opp_max when opp has fewer chips, all_in capped at opp_max, no cap when opp has more chips.",
+    "raise_max_capped_integration": "PASS: Integration test with starting_chips=300 verifies raise max <= 300 (opponent effective stack). UI raise slider max=150 (pot-limit formula) <= 500 (starting chips) verified.",
+    "allin_capped": "PASS: Unit test confirms all_in amount = min(player_total, opp_max) when opp has fewer chips.",
+    "midgame_joiner_sitting_out": "PASS: CardShark joining mid-game has status=sitting_out confirmed via GET /api/tables/{id}.",
+    "sitting_out_no_assignment_block": "PASS: sitting_out player not counted in assignment denominator (only active/all_in players). Frontend PokerTable.tsx line 1043: players.filter(p => ['active','all_in'].includes(p.status)).length confirmed in code review.",
+    "sitting_out_no_quorum_block": "PASS: ready_next_hand quorum uses participated_uids = {p.user_id for p in room.players if p.status != 'sitting_out'}. Two active players vote → next hand starts without waiting for sitting_out joiner.",
+    "basic_game_flow": "PASS: Full game flow tested: create table → join × 2 → start → preflop call/check → flop → turn → river → assignment phase → card assignment submission → showdown → board_winners computed → next hand."
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_iter17_badges_effectivestack_history.py",
+    "/app/test_reports/pytest/pytest_results_iter17.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "Effective stack cap opp_max = max(q.chips + q.bet_street for q in active_opps) is correct: caps max raise/all-in at what opponents can call, preventing dead-money raises.",
+    "History.tsx gracefully falls back to winner-text for old records without assignments field (line 387: {!hand.assignments && ...}) - correct approach for backward compatibility.",
+    "PokerTable.tsx assignment denominator at line 1043 correctly uses ['active','all_in'].includes(p.status) to exclude sitting_out players.",
+    "server.py ready_next_hand quorum check (line 1161) correctly uses p.status != 'sitting_out' to exclude mid-game joiners from the quorum calculation.",
+    "PlayerSeat badges: all 3 render locations (opponent seats, my seat, spectator view) properly pass isDealer/isSB/isBB props based on round !== 'waiting' guard."
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_iter17_badges_effectivestack_history.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (14/14 tests)",
+    "frontend": "100% - All 9 requested features verified (screenshots + code review + Playwright)"
+  },
+
+  "test_credentials": {
+    "player1": "AceKing / 1111",
+    "player2": "BluffMaster / 2222",
+    "player3": "CardShark / 3333",
+    "admin": "TableAdmin / 0000"
+  },
+
+  "seed_data_creation": "Test tables TEST17_effstack, TEST17_dealer_badges, TEST17_joiner, TEST17_assign_denom, TEST17_flow, TEST17_badges, TEST17_raisecap, TEST17_fullhand created during testing.",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "Iteration 17 tests all pass (100%). App at https://multi-board-poker.preview.emergentagent.com. Features verified: (1) D/SB/BB inline badges on PlayerSeat - gray/amber/cyan pills; (2) no floating D button; (3) History page shows PlayingCard SVG components for community cards + player hole card assignments per board; (4) effective stack cap: opp_max = max(q.chips + q.bet_street) caps raise max and all_in; (5) mid-game joiners (sitting_out) excluded from assignment denominator and ready_next_hand quorum. Previous iters 10-17 all 100%. Backend test file: /app/backend/tests/test_iter17_badges_effectivestack_history.py."
+}

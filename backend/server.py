@@ -84,6 +84,8 @@ async def _save_hand_history(room: 'GameRoom', result: Dict):
         "chips_won": chips_won,
         "boards": boards_data,
         "players": players_data,
+        "hole_cards_revealed": result.get("hole_cards_revealed", {}),
+        "assignments": room.hand.assignments if room.hand else {},
         "played_at": datetime.now(timezone.utc),
     }
     await db.hand_history.insert_one(doc)
@@ -478,6 +480,10 @@ async def _send_valid_actions(room: GameRoom):
     if not p or p.status != "active":
         return
     total_pot = room.total_pot()
+    # Effective stack cap: max total any active/all-in opponent can commit this street
+    active_opps = [q for q in room.players if q.user_id != p.user_id
+                   and q.status in ("active", "all_in")]
+    opp_max = max((q.chips + q.bet_street for q in active_opps), default=None)
     acts = valid_actions(
         player_chips=p.chips,
         player_bet=p.bet_street,
@@ -485,6 +491,7 @@ async def _send_valid_actions(room: GameRoom):
         last_raise_size=room.hand.last_raise,
         blind_big=room.blind_big,
         total_pot=total_pot,
+        opp_max=opp_max,
     )
     await _send(room, p.user_id, {"type": "your_turn",
                                    "data": {"valid_actions": acts, "time_limit": 30}})
@@ -527,8 +534,12 @@ async def _apply_action(room: GameRoom, uid: str, action: str, amount: int):
 
     elif action in ("raise", "all_in"):
         total_pot = room.total_pot()
+        # Apply same effective stack cap as valid_actions display
+        active_opps = [q for q in room.players if q.user_id != uid
+                       and q.status in ("active", "all_in")]
+        opp_max = max((q.chips + q.bet_street for q in active_opps), default=None)
         acts = valid_actions(p.chips, p.bet_street, room.hand.current_bet,
-                             room.hand.last_raise, room.blind_big, total_pot)
+                             room.hand.last_raise, room.blind_big, total_pot, opp_max)
         if action == "all_in":
             amount = acts.get("all_in", p.bet_street + p.chips)
 
@@ -536,8 +547,10 @@ async def _apply_action(room: GameRoom, uid: str, action: str, amount: int):
         ra = acts.get("raise")
         if ra:
             amount = max(ra["min"], min(ra["max"], amount))
+        elif "all_in" in acts:
+            amount = acts["all_in"]  # respect effective stack cap
         else:
-            amount = p.bet_street + p.chips  # only all-in left
+            amount = p.bet_street + p.chips  # fallback
 
         add_chips = amount - p.bet_street
         raise_size = amount - room.hand.current_bet

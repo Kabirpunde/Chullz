@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PlayingCard from '../components/PlayingCard';
 
 interface PlayerStat {
   user_id: string; username: string; avatar: string; avatar_color: string;
@@ -21,6 +22,8 @@ interface HandRecord {
   boards: { board_id: number; flop: string[]; turn: string; river: string }[];
   players: HandPlayer[];
   played_at: string;
+  hole_cards_revealed?: Record<string, string[]>;
+  assignments?: Record<string, Record<string, string[]>>;
 }
 
 const BOARD_COLORS = ['#3b82f6', '#22c55e', '#f59e0b'];
@@ -325,30 +328,69 @@ function HandsTab({ hands, myUserId, expanded, setExpanded }: {
             {/* Expanded detail */}
             {isOpen && (
               <div style={{ borderTop: '1px solid #1e293b', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {/* Boards */}
+                {/* Boards with card graphics */}
                 {!hand.uncontested && (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {BOARD_KEYS.map((bk, bi) => {
                       const winners = hand.board_winners[bk] ?? [];
-                      const winnerNames = winners.map(uid => hand.players.find(p => p.user_id === uid)?.username ?? uid);
                       const color = BOARD_COLORS[bi];
                       const board = hand.boards[bi];
-                      const cards = board ? [...board.flop, board.turn, board.river].filter(Boolean) : [];
+                      const community = board ? [...board.flop, board.turn, board.river].filter(Boolean) : [];
                       return (
                         <div key={bk} style={{
-                          flex: 1, minWidth: 140,
                           background: '#131a2a', borderRadius: 10,
-                          border: `1px solid ${color}40`, padding: '8px 12px',
+                          border: `1px solid ${color}40`, padding: '10px 12px',
                         }}>
-                          <div style={{ fontSize: 10, fontWeight: 900, color, letterSpacing: 1, marginBottom: 4 }}>
-                            BOARD {bi + 1}
+                          {/* Board header + community cards */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 10, fontWeight: 900, color, letterSpacing: 1, minWidth: 48 }}>
+                              BOARD {bi + 1}
+                            </span>
+                            <div style={{ display: 'flex', gap: 3 }}>
+                              {community.map((card, ci) => <PlayingCard key={ci} card={card} size="xs" />)}
+                              {/* placeholder face-downs if board incomplete */}
+                              {Array.from({ length: Math.max(0, 5 - community.length) }, (_, ci) => (
+                                <PlayingCard key={`ph-${ci}`} size="xs" faceDown />
+                              ))}
+                            </div>
                           </div>
-                          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>
-                            {cards.join(' ')}
-                          </div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: winnerNames.length > 0 ? color : '#475569' }}>
-                            {winnerNames.length > 0 ? `🏆 ${winnerNames.join(', ')}` : '—'}
-                          </div>
+                          {/* Per-player assigned hole cards */}
+                          {hand.assignments && Object.entries(hand.assignments).map(([uid, assign]) => {
+                            const boardHole: string[] = assign[bk] ?? [];
+                            const isWinner = winners.includes(uid);
+                            const p = hand.players.find(p => p.user_id === uid);
+                            if (!p) return null;
+                            return (
+                              <div key={uid} style={{
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                padding: '5px 6px', borderRadius: 8, marginBottom: 2,
+                                background: isWinner ? color + '10' : 'transparent',
+                              }}>
+                                <span style={{ fontSize: 14, flexShrink: 0 }}>{p.avatar}</span>
+                                <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+                                  {boardHole.map((c, ci) => <PlayingCard key={ci} card={c} size="xs" />)}
+                                  {boardHole.length === 0 && <span style={{ fontSize: 10, color: '#334155' }}>—</span>}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <span style={{
+                                    fontSize: 11, fontWeight: 700,
+                                    color: isWinner ? color : '#64748b',
+                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block',
+                                  }}>
+                                    {isWinner ? '🏆 ' : ''}{p.username}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {/* Fallback: if no assignments stored (old records), show winner text */}
+                          {!hand.assignments && (
+                            <div style={{ fontSize: 12, fontWeight: 700, color: winners.length > 0 ? color : '#475569', marginTop: 4 }}>
+                              {winners.length > 0
+                                ? `🏆 ${winners.map(uid => hand.players.find(p => p.user_id === uid)?.username ?? uid).join(', ')}`
+                                : '—'}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
