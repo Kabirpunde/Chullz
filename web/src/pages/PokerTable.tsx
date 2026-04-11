@@ -35,8 +35,11 @@ const ZONE_W = TABLE_W + PAD * 2;                    // ZONE has PAD on each sid
 const ZONE_H = TABLE_H + PAD * 2;
 
 // ── Seat arrangement (angles around the oval) ─────────────────────────────────
-// My seat is always at the bottom (90°). Up to 5 opponent slots at other angles.
-const SEAT_ANGLES = [-90, -45, 0, 135, -135]; // top, upper-right, right, lower-left, left
+// My seat is always at the bottom (90°). Opponent slots are ordered CLOCKWISE
+// from my position: lower-left → left → top → upper-right → right.
+// This means the player who acts immediately after me is always to my lower-left,
+// and the turn timer visually travels clockwise around the table.
+const SEAT_ANGLES = [135, -135, -90, -45, 0]; // lower-left, left, top, upper-right, right
 // Fixed seat-number → angle map used for spectator view (shows all 6 actual seat positions)
 const SEAT_TO_ANGLE: Record<number, number> = { 0: -90, 1: -45, 2: 0, 3: 90, 4: 135, 5: -135 };
 
@@ -627,11 +630,18 @@ export default function PokerTable() {
   // User is a spectator if we have state but they're not in the players list
   const isSpectator = !!gameState && !myPlayer;
   const isAdmin = user?.role === 'admin';
-  const opponents = SEAT_ANGLES.map((_, i) => {
-    // Assign opponents to fixed visual slots (excluding me)
-    const opps = players.filter(p => p.user_id !== user?.id);
-    return opps[i] ?? null;
-  });
+  const opponents = (() => {
+    const mySeat = myPlayer?.seat ?? -1;
+    const maxP = gameState?.max_players ?? 6;
+    // Place opponents in clockwise order starting from the seat immediately after mine.
+    // SEAT_ANGLES[0]=lower-left is the first clockwise slot, so the next player to act
+    // is always to my lower-left and the turn circle travels clockwise visually.
+    return SEAT_ANGLES.map((_, i) => {
+      if (mySeat < 0) return null;
+      const targetSeat = (mySeat + 1 + i) % maxP;
+      return players.find(p => p.seat === targetSeat) ?? null;
+    });
+  })();
   const isMyTurn = myPlayer && myPlayer.seat === gameState?.current_seat && round !== 'waiting' && round !== 'showdown' && round !== 'assignment';
   const callAction = validActions?.find(a => a.action === 'call');
   const checkAction = validActions?.find(a => a.action === 'check');
