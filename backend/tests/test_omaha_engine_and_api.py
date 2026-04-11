@@ -14,7 +14,7 @@ import sys
 sys.path.insert(0, '/app/backend')
 from game_engine import best_hand_omaha, score_boards
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://card-game-live-1.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://multi-board-poker.preview.emergentagent.com')
 
 
 # ─── Direct Engine Tests ──────────────────────────────────────────────────────

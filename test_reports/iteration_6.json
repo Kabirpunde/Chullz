@@ -1,5 +1,5 @@
 {
-  "summary": "Frontend-only testing of Chullz Poker React+Vite PWA at https://card-game-live-1.preview.emergentagent.com. All core features verified at mobile viewport 390x844. Login screen, PIN modal, lobby, create table modal, poker table oval layout, and back navigation all working correctly.",
+  "summary": "Frontend-only testing of Chullz Poker React+Vite PWA at https://multi-board-poker.preview.emergentagent.com. All core features verified at mobile viewport 390x844. Login screen, PIN modal, lobby, create table modal, poker table oval layout, and back navigation all working correctly.",
   "backend_issues": {
     "critical": [],
     "minor": []

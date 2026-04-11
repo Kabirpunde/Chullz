@@ -9,7 +9,7 @@ import pytest
 import requests
 import time
 
-BASE_URL = "https://card-game-live-1.preview.emergentagent.com"
+BASE_URL = "https://multi-board-poker.preview.emergentagent.com"
 
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────

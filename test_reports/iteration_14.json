@@ -91,7 +91,7 @@
   "retest_needed": false,
   "should_main_agent_self_test": false,
 
-  "context_for_next_testing_agent": "handEvaluator.ts at /app/web/src/utils/handEvaluator.ts - compiled to /tmp/handeval/handEvaluator.js for Node.js testing. All board-strength badge tests passed. Web app at https://card-game-live-1.preview.emergentagent.com. Login uses lowercase profile testids (profile-aceking). Game setup: create table via POST /api/tables/create (then players must ALSO join via POST /api/tables/join). Only the host (creator) can start via WS 'start_game'. To reach flop: both players need WS connections and auto-act through preflop betting. desc5Omaha() uses shorthand notation not matching standard poker descriptions.",
+  "context_for_next_testing_agent": "handEvaluator.ts at /app/web/src/utils/handEvaluator.ts - compiled to /tmp/handeval/handEvaluator.js for Node.js testing. All board-strength badge tests passed. Web app at https://multi-board-poker.preview.emergentagent.com. Login uses lowercase profile testids (profile-aceking). Game setup: create table via POST /api/tables/create (then players must ALSO join via POST /api/tables/join). Only the host (creator) can start via WS 'start_game'. To reach flop: both players need WS connections and auto-act through preflop betting. desc5Omaha() uses shorthand notation not matching standard poker descriptions.",
 
   "rca_of_tests": {
     "hand_evaluator": "bestHandOmaha() correctly enforces Omaha rule (uses EXACTLY 2 hole cards + 3 community). desc5Omaha() uses hole card max for 'high' label on flush/high-card hands. boardStrengths in PokerTable.tsx computed from orderedHoleCards (pairs: [0,1]→B1, [2,3]→B2, [4,5]→B3) on every render.",

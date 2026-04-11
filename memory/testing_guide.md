@@ -2,7 +2,7 @@
 
 ## Quick Reference
 
-**App URL**: `https://card-game-live-1.preview.emergentagent.com`
+**App URL**: `https://multi-board-poker.preview.emergentagent.com`
 **Backend API**: Same URL with `/api` prefix
 
 ## Test Credentials
@@ -126,7 +126,7 @@ await page.keyboard.type("1111")
 For backend-only tests, use curl:
 
 ```bash
-API_URL="https://card-game-live-1.preview.emergentagent.com"
+API_URL="https://multi-board-poker.preview.emergentagent.com"
 
 # Login and get token
 TOKEN=$(curl -s -X POST "$API_URL/api/auth/login" \
