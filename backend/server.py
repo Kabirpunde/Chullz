@@ -1042,10 +1042,6 @@ async def admin_give_bankroll_chips(uid: str, req: GiveChipsReq, cu: dict = Depe
         raise HTTPException(404, "Player not found")
     user = await db.users.find_one({"_id": ObjectId(uid)}, {"pin_hash": 0})
     return {"success": True, "chips_added": req.amount, "new_bankroll": user["chips"]}
-    room = game_rooms.get(table_id)
-    if not room:
-        raise HTTPException(404, "Table not found")
-    return _public_state(room)
 
 
 @api.delete("/tables/{table_id}/leave")

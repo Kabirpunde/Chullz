@@ -86,7 +86,12 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 ### Phase 5 (Live Preview — 2026-05-xx)
 - **Live Hand Strength Badges** — `bestHandOmaha()` in `handEvaluator.ts`; 3 reactive badges under hole cards during flop/turn/river/assignment; Omaha shorthand; hole-card-relative high labels
 
-### Phase 7 (2026-02)
+### Phase 8 (2026-02)
+- **Bankroll + Top-up system** — `db.users.chips` = bankroll; `POST /api/tables/{id}/topup` deducts from bankroll, adds to in-game chips; max = max(largest stack, starting_chips). Blocking modal when chips = 0; always-visible Rebuy button otherwise.
+- **Sit Out / Come Back / Leave Table** — Small buttons above action bar. `wants_sitout` flag on `GPlayer`; `_start_hand` skips sitting-out players. WS `toggle_sitout` message. `leave_table` now broadcasts state.
+- **Admin Panel** — `/admin` page: all players with bankroll + quick chip amounts + custom input. "Admin" button in lobby header for admin users.
+- **Admin give-chips at table** — Green `+` button per opponent for admin; `POST /api/tables/{id}/admin/give-chips/{uid}` adds to in-game + bankroll.
+- **Pot display on felt** — Pot moved from top bar to inside oval felt below boards (shows total = pot + current street bets).
 - **SB/BB/D inline badges** — Small colored pills below player chips (D=gray, SB=amber, BB=cyan); standalone overlapping D button removed
 - **Effective stack betting** — `valid_actions` gains `opp_max` param; raise/all-in capped at max any non-folded opponent can commit; prevents dead-money bets and refunds
 - **History page card graphics** — Board community cards and per-player assigned hole cards now shown as `PlayingCard` graphics; backend saves `hole_cards_revealed` + `assignments` to hand_history
