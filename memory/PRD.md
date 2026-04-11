@@ -86,6 +86,12 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 ### Phase 5 (Live Preview — 2026-05-xx)
 - **Live Hand Strength Badges** — `bestHandOmaha()` in `handEvaluator.ts`; 3 reactive badges under hole cards during flop/turn/river/assignment; Omaha shorthand; hole-card-relative high labels
 
+### Phase 6 Bug Fixes (2026-02)
+- **Assignment stuck at 2/3** — `pendingAssignmentRef` in PokerTable.tsx: game_state handler now syncs `submitting` with server truth on every WS message; auto-re-sends pending assignment after reconnect
+- **Vote stuck at 2/3** — `pendingVoteRef` in PokerTable.tsx: game_state handler now syncs `readyVoted` with server truth on every WS message; auto-re-sends pending vote after reconnect
+- **Sitting_out quorum bug** — Backend `ready_next_hand` now uses `participated_uids` (excludes `sitting_out`) for quorum; frontend ShowdownOverlay denominator also excludes `sitting_out`
+- **AssignmentPanel.tsx deleted** — Component was unused; `Assignment` type moved inline to `PokerTable.tsx`
+
 ### P3 Future / Backlog
 - AI bot player for solo practice
 - Quick Match auto-matchmaking
