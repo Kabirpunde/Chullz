@@ -890,7 +890,7 @@ export default function PokerTable() {
                           border: `1px solid ${isSide ? '#3b82f620' : 'transparent'}`,
                           minWidth: 60,
                         }}>
-                          <div style={{ fontSize: 8, color: isSide ? '#3b82f6' : '#64748b', fontWeight: 700, letterSpacing: 0.5 }}>
+                          <div style={{ fontSize: 8, color: i === 0 ? '#64748b' : '#3b82f6', fontWeight: 700, letterSpacing: 0.5 }}>
                             {i === 0 ? 'MAIN' : `SIDE ${i}`}
                           </div>
                           <div style={{ fontSize: 11, fontWeight: 900, color: '#ffb800', lineHeight: 1.2 }}>

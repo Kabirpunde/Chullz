@@ -86,7 +86,9 @@ PPPoker dark theme, and 7 pre-seeded test accounts.
 ### Phase 5 (Live Preview — 2026-05-xx)
 - **Live Hand Strength Badges** — `bestHandOmaha()` in `handEvaluator.ts`; 3 reactive badges under hole cards during flop/turn/river/assignment; Omaha shorthand; hole-card-relative high labels
 
-### Phase 8 (2026-02)
+### Phase 9 (2026-02) — Pot Rules
+- **Under-raise rule** — `HandState.no_raise_uids` set tracks players locked from re-raising. Under-raise detected when `raise_size < min_raise_increment` (previous `last_raise` or BB). Players who already acted are added to `no_raise_uids`; their valid_actions have raise/all_in suppressed. Full raise clears the set. New street (`_advance_round`) also clears it. WS handler enforces server-side.
+- **Side pot display** — `_compute_pots()` computes live side pots from `p.bet_total` (cumulative). Sent as `pots` array in every `game_state` broadcast. Frontend renders MAIN/SIDE pot chips side-by-side inside oval felt, each showing amount + eligible player avatars.
 - **Bankroll + Top-up system** — `db.users.chips` = bankroll; `POST /api/tables/{id}/topup` deducts from bankroll, adds to in-game chips; max = max(largest stack, starting_chips). Blocking modal when chips = 0; always-visible Rebuy button otherwise.
 - **Sit Out / Come Back / Leave Table** — Small buttons above action bar. `wants_sitout` flag on `GPlayer`; `_start_hand` skips sitting-out players. WS `toggle_sitout` message. `leave_table` now broadcasts state.
 - **Admin Panel** — `/admin` page: all players with bankroll + quick chip amounts + custom input. "Admin" button in lobby header for admin users.

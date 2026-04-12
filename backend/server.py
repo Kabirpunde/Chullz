@@ -622,7 +622,6 @@ async def _apply_action(room: GameRoom, uid: str, action: str, amount: int):
                     room.hand.no_raise_uids.add(other.user_id)
 
     # Track total contributions
-    room.hand.contributions[uid] = room.hand.contributions.get(uid, 0)
     room.hand.contributions[uid] = p.bet_total
 
     # Check if only one player remains
