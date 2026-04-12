@@ -21,6 +21,7 @@ interface GameState {
   hand_number: number; timer_ends: number; assigned_uids: string[];
   blind_small: number; blind_big: number; max_players: number; starting_chips: number;
   last_showdown: unknown; showdown_ready: string[];
+  pots?: Array<{ amount: number; eligible_uids: string[] }>;
 }
 
 // ── Sizing constants ──────────────────────────────────────────────────────────
@@ -865,18 +866,46 @@ export default function PokerTable() {
                   Waiting for players…
                 </div>
               )}
-              {/* Total pot on felt — shown during active hands */}
+              {/* Pot display on felt — main pot + side pots side by side */}
               {round !== 'waiting' && (() => {
-                const total = (gameState?.pot ?? 0) + players.reduce((s, p) => s + p.bet_street, 0);
-                return total > 0 ? (
-                  <div style={{
-                    fontSize: 13, fontWeight: 900, color: '#ffb800',
-                    background: 'rgba(0,0,0,0.4)', borderRadius: 10,
-                    padding: '3px 12px', marginTop: 2, letterSpacing: 0.5,
-                  }}>
-                    🪙 {total.toLocaleString()}
+                const rawPots = gameState?.pots;
+                // Fallback to single pot if no pots data yet
+                const totalFallback = (gameState?.pot ?? 0) + players.reduce((s, p) => s + p.bet_street, 0);
+                if (!rawPots || rawPots.length === 0) {
+                  return totalFallback > 0 ? (
+                    <div style={{ fontSize: 12, fontWeight: 900, color: '#ffb800', background: 'rgba(0,0,0,0.4)', borderRadius: 10, padding: '3px 12px', marginTop: 2 }}>
+                      🪙 {totalFallback.toLocaleString()}
+                    </div>
+                  ) : null;
+                }
+                return (
+                  <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap', marginTop: 2 }}>
+                    {rawPots.map((pot, i) => {
+                      const eligiblePlayers = players.filter(p => pot.eligible_uids.includes(p.user_id));
+                      const isSide = i > 0 || rawPots.length > 1;
+                      return (
+                        <div key={i} style={{
+                          textAlign: 'center', background: 'rgba(0,0,0,0.5)',
+                          borderRadius: 8, padding: '3px 8px',
+                          border: `1px solid ${isSide ? '#3b82f620' : 'transparent'}`,
+                          minWidth: 60,
+                        }}>
+                          <div style={{ fontSize: 8, color: isSide ? '#3b82f6' : '#64748b', fontWeight: 700, letterSpacing: 0.5 }}>
+                            {i === 0 ? 'MAIN' : `SIDE ${i}`}
+                          </div>
+                          <div style={{ fontSize: 11, fontWeight: 900, color: '#ffb800', lineHeight: 1.2 }}>
+                            🪙 {pot.amount.toLocaleString()}
+                          </div>
+                          <div style={{ display: 'flex', gap: 1, justifyContent: 'center', marginTop: 1 }}>
+                            {eligiblePlayers.map(p => (
+                              <span key={p.user_id} title={p.username} style={{ fontSize: 9 }}>{p.avatar}</span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                ) : null;
+                );
               })()}
             </div>
           </div>

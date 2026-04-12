@@ -1,0 +1,69 @@
+{
+  "summary": "Iteration 20: Full testing of under-raise rule (no_raise_uids) + side pot display. All 13 backend tests passed (100%). Frontend verified working. Under-raise logic, side pot computation, WS enforcement, and multi-pot UI display all verified correct.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "server.py line 625",
+        "issue": "Redundant no-op assignment: `room.hand.contributions[uid] = room.hand.contributions.get(uid, 0)` is immediately overwritten by line 626. Not a bug but dead code."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "PokerTable background fetch",
+        "issue": "Occasional 'Fetch error: TypeError: Failed to fetch' console warning during page load (likely from bankroll fetch race condition). Does not affect gameplay.",
+        "affected_selectors": []
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Pot display (multi-pot)",
+        "issues": ["When rawPots.length > 1, both MAIN and SIDE labels show in blue (#3b82f6) because isSide = i > 0 || rawPots.length > 1. MAIN pot loses its distinct gray color when side pots exist. Minor visual inconsistency but not a bug."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter20_underraise_sidepot.py",
+    "/app/test_reports/pytest/pytest_results_iter20.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "HandState.no_raise_uids: correctly implemented as set(), cleared in _advance_round ✓",
+    "_compute_pots: correctly uses bet_total (cumulative across streets) for live side pot calculation ✓",
+    "_send_valid_actions: correctly suppresses both 'raise' AND 'all_in' (when > current_bet) for no_raise_uids players ✓",
+    "_apply_action: full vs under-raise detection is_full_raise = raise_size >= min_raise_increment — handles negative raise_size (short all-in) correctly ✓",
+    "WS enforcement: game_ws handler converts all-in ≤ current_bet to call for no_raise_uids players ✓",
+    "Frontend pots interface: GameState.pots?: Array<{amount, eligible_uids}> correctly typed ✓",
+    "Frontend pot display: MAIN/SIDE labels side by side with player avatars inside oval felt ✓",
+    "Redundant dead code: server.py L625 `room.hand.contributions[uid] = room.hand.contributions.get(uid, 0)` is immediately overwritten by L626 — minor cleanup candidate"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter20_underraise_sidepot.py"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 tests passed)",
+    "frontend": "100% (all UI features verified)"
+  },
+  "test_credentials": "AceKing (tap), BluffMaster (tap), CardShark (tap), TableAdmin (tap→admin). No PIN needed for quick login.",
+  "seed_data_creation": "Created and cleaned up 5 test tables during testing (all deleted via admin).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All features from iteration 20 verified: (1) Under-raise via WS: A raises 200 (full), B raises 500 (full), C all-in 650 (under-raise: raise_size=150 < last_raise=300) → B added to no_raise_uids, A not. (2) B gets valid_actions without raise ✓. (3) WS enforcement: server returns 'Cannot raise — under-raise: action not reopened' error ✓. (4) Full raise clears no_raise_uids, B can raise again ✓. (5) _advance_round clears no_raise_uids on new street ✓. (6) _compute_pots: unit tested all scenarios (single pot, side pot with all-in, folded player excluded) ✓. (7) Frontend: MAIN/SIDE labels with player avatars visible in oval felt ✓. (8) Quick login regression ✓. Backend test file: /app/backend/tests/test_iter20_underraise_sidepot.py (13 tests). WS tests use asyncio.run() with websockets library.",
+  "verified_features": {
+    "under_raise_no_raise_uids_blocks_B": "PASS - B in no_raise_uids after C's under-raise all-in; B's valid_actions has no raise",
+    "under_raise_A_not_blocked": "PASS - A (has_acted=False when C went all-in) NOT in no_raise_uids; A's valid_actions has raise",
+    "ws_enforcement_under_raise": "PASS - Server returns error 'Cannot raise — under-raise: action not reopened' when B (in no_raise_uids) sends raise action",
+    "full_raise_clears_no_raise_uids": "PASS - After A makes full raise (raise_size >= last_raise), no_raise_uids cleared, B gets raise option back",
+    "advance_round_clears_no_raise_uids": "PASS - Moving to flop (new street) clears no_raise_uids",
+    "compute_pots_single": "PASS - Equal bets → 1 main pot with all players eligible",
+    "compute_pots_side_pot_allin": "PASS - A=200, B=500, C=650(all_in) → 3 pots: 600(A,B,C), 600(B,C), 150(C)",
+    "compute_pots_folded_excluded": "PASS - Folded players excluded from eligible_uids",
+    "side_pot_ui_display": "PASS - MAIN + SIDE 1 labels with player avatars displayed side by side in oval felt",
+    "quick_login_regression": "PASS - POST /api/auth/login-quick works for all 7 players, invalid user returns 404",
+    "basic_game_flow": "PASS - Table create/join/start/preflop/action bar all working"
+  },
+  "rca_of_bugs": "No bugs found. All features implemented correctly."
+}

@@ -229,6 +229,7 @@ class HandState:
     assignments: Dict[str, Dict[str, List[str]]] = field(default_factory=dict)
     assign_end: float = 0.0
     contributions: Dict[str, int] = field(default_factory=dict)  # uid → total hand chips
+    no_raise_uids: set = field(default_factory=set)  # uids blocked from raising (under-raise)
 
 @dataclass
 class GameRoom:
@@ -273,6 +274,33 @@ game_rooms: Dict[str, GameRoom] = {}
 # ══════════════════════════════════════════════════════════════════════════════
 # BROADCAST HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
+def _compute_pots(room: 'GameRoom') -> List[Dict]:
+    """Compute side pots from total player contributions for live display."""
+    if not room.hand:
+        return []
+    # Contributions = p.bet_total (cumulative across all streets including current)
+    contribs: Dict[str, int] = {}
+    for p in room.players:
+        if p.status != 'sitting_out' and p.bet_total > 0:
+            contribs[p.user_id] = p.bet_total
+    if not contribs:
+        return []
+    # Players still eligible to win (active + all_in = still in the hand)
+    eligible_set = {p.user_id for p in room.players if p.status in ('active', 'all_in')}
+    sorted_levels = sorted(set(contribs.values()))
+    pots: List[Dict] = []
+    prev = 0
+    contributors = list(contribs.keys())
+    for level in sorted_levels:
+        amt = (level - prev) * len(contributors)
+        if amt > 0:
+            eligible = [uid for uid in contributors if uid in eligible_set]
+            pots.append({"amount": amt, "eligible_uids": eligible})
+        contributors = [uid for uid in contributors if contribs[uid] > level]
+        prev = level
+    return [p for p in pots if p["eligible_uids"]]  # hide uncontested excess pots
+
+
 def _public_state(room: GameRoom) -> Dict:
     boards = []
     if room.hand:
@@ -301,6 +329,7 @@ def _public_state(room: GameRoom) -> Dict:
         "assigned_uids": list(room.hand.assignments.keys()) if room.hand else [],
         "last_showdown": room.last_showdown,
         "showdown_ready": list(room.showdown_ready),
+        "pots": _compute_pots(room),
     }
 
 async def _broadcast(room: GameRoom, msg: Dict):
@@ -495,6 +524,12 @@ async def _send_valid_actions(room: GameRoom):
         total_pot=total_pot,
         opp_max=opp_max,
     )
+    # Under-raise restriction: player's action was not reopened — can only call or fold
+    if p.user_id in room.hand.no_raise_uids:
+        acts.pop("raise", None)
+        # Remove all_in only if it would exceed current_bet (i.e., it's a raise in disguise)
+        if "all_in" in acts and acts["all_in"] > room.hand.current_bet:
+            acts.pop("all_in", None)
     await _send(room, p.user_id, {"type": "your_turn",
                                    "data": {"valid_actions": acts, "time_limit": 30}})
 
@@ -560,16 +595,31 @@ async def _apply_action(room: GameRoom, uid: str, action: str, amount: int):
         p.bet_street = amount
         p.bet_total += add_chips
         room.hand.bets[p.seat] = amount
-        if raise_size > 0:
-            room.hand.last_raise = raise_size
+
+        # Determine if this is a full raise or an under-raise
+        # Full raise: raise_size must be >= the previous raise increment (or BB if first raise)
+        min_raise_increment = room.hand.last_raise if room.hand.last_raise > 0 else room.blind_big
+        is_full_raise = raise_size >= min_raise_increment
+
+        if is_full_raise and raise_size > 0:
+            room.hand.last_raise = raise_size  # only update on full raise
         room.hand.current_bet = amount
         if p.chips == 0:
             p.status = "all_in"
         p.has_acted = True
-        # Reset others' has_acted
-        for other in room.players:
-            if other.user_id != uid and other.status == "active":
-                other.has_acted = False
+
+        if is_full_raise:
+            # Full raise: action reopens — clear restrictions, reset has_acted for active players
+            room.hand.no_raise_uids = set()
+            for other in room.players:
+                if other.user_id != uid and other.status == "active":
+                    other.has_acted = False
+        else:
+            # Under-raise (all-in < min raise): action does NOT reopen for players who already acted
+            # Add all active players who already acted to the no-raise restriction set
+            for other in room.players:
+                if other.user_id != uid and other.status == "active" and other.has_acted:
+                    room.hand.no_raise_uids.add(other.user_id)
 
     # Track total contributions
     room.hand.contributions[uid] = room.hand.contributions.get(uid, 0)
@@ -602,6 +652,7 @@ async def _advance_round(room: GameRoom):
     room.hand.bets = {}
     room.hand.current_bet = 0
     room.hand.last_raise = 0
+    room.hand.no_raise_uids = set()  # new street — all restrictions lifted
     for p in room.players:
         p.bet_street = 0
         p.has_acted = False
@@ -1227,6 +1278,15 @@ async def game_ws(ws: WebSocket, table_id: str, user_id: str):
             elif mtype == "player_action":
                 action = data.get("action", "fold")
                 amount = int(data.get("amount", 0))
+                # Under-raise enforcement: player in no_raise_uids cannot raise above current_bet
+                if room.hand and action in ("raise", "all_in") and user_id in room.hand.no_raise_uids:
+                    p_check = room.by_uid(user_id)
+                    if p_check and (p_check.bet_street + p_check.chips) <= room.hand.current_bet:
+                        # All-in for ≤ current_bet is effectively a call — allow it
+                        action = "call"
+                    else:
+                        await _send(room, user_id, {"type": "error", "data": {"message": "Cannot raise — under-raise: action not reopened"}})
+                        continue
                 await _apply_action(room, user_id, action, amount)
 
             elif mtype == "assign_cards":
